@@ -74,9 +74,7 @@ function App() {
                         </div>
                     </div>
 
-                    <div className="absolute bottom-8 left-0 right-0 text-center text-white/30 text-xs">
-                        Restricted to New York, New Jersey, and Connecticut
-                    </div>
+
                 </div>
             )}
 

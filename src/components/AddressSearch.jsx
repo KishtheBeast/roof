@@ -60,7 +60,7 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
             <div className="relative">
                 <input
                     type="text"
-                    placeholder="Enter address (NY, NJ, CT only)..."
+                    placeholder="Enter address..."
                     className="w-full pl-10 pr-4 py-3 rounded-lg shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/95 backdrop-blur-sm text-gray-900"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}

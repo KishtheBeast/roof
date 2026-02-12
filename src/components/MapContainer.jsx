@@ -5,6 +5,11 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
 import 'leaflet-draw';
 
+// Hide the draw toolbar UI but keep functionality
+const hideToolbarStyle = document.createElement('style');
+hideToolbarStyle.innerHTML = `.leaflet-draw-toolbar { display: none !important; }`;
+document.head.appendChild(hideToolbarStyle);
+
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -168,18 +173,16 @@ export default function RoofMap({ center, zoom, onPolygonUpdate }) {
     }, [onPolygonUpdate]);
 
     return (
-        <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }}>
+        <MapContainer center={center} zoom={zoom} zoomControl={false} attributionControl={false} style={{ height: '100%', width: '100%' }}>
             <ChangeView center={center} zoom={zoom} />
             <TileLayer
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
                 maxNativeZoom={19}
                 maxZoom={22}
             />
 
             <TileLayer
                 url="https://stamen-tiles-{s}.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}{r}.png"
-                attribution='Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 opacity={0.7}
             />
 
