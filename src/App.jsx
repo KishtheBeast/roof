@@ -78,25 +78,32 @@ function App() {
                 </div>
             )}
 
-            {/* Map Application Mode */}
+            {/* Map Application Mode - Split Screen Layout */}
             {hasLocation && (
-                <>
-                    <AddressSearch
-                        onLocationSelect={handleLocationSelect}
-                        className="absolute top-4 left-4 z-[1000] w-full max-w-md font-sans"
-                    />
+                <div className="flex flex-col h-full w-full">
 
-                    {/* Map handles view changes internal via ChangeView now */}
-                    <RoofMap
-                        center={mapCenter}
-                        zoom={mapZoom}
-                        onPolygonUpdate={handlePolygonUpdate}
-                    />
+                    {/* Top: Map Section */}
+                    <div className="flex-1 relative w-full isolate">
+                        <div className="absolute inset-0">
+                            <RoofMap
+                                center={mapCenter}
+                                zoom={mapZoom}
+                                onPolygonUpdate={handlePolygonUpdate}
+                            />
+                        </div>
 
-                    <MeasurementDisplay areaSqFt={areaSqFt} />
+                        <AddressSearch
+                            onLocationSelect={handleLocationSelect}
+                            className="absolute top-4 left-4 right-4 md:right-auto md:w-96 z-[5000] font-sans"
+                        />
+                    </div>
 
-                    {/* Back button or persistent branding could go here */}
-                </>
+                    {/* Bottom: Measurement Details Panel */}
+                    <div className="flex-none relative z-[1000]">
+                        <MeasurementDisplay areaSqFt={areaSqFt} />
+                    </div>
+
+                </div>
             )}
         </div>
     );
