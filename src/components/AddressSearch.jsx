@@ -2,72 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Search, MapPin } from 'lucide-react';
 
-export default function AddressSearch({ onLocationSelect }) {
+export default function AddressSearch({ onLocationSelect, className = "absolute top-4 left-4 z-[1000] w-full max-w-md font-sans" }) {
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
 
-    // Debounce search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (query.length > 2) {
-                performSearch(query);
-            } else {
-                setResults([]);
-                setShowDropdown(false);
-            }
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [query]);
-
-    const performSearch = async (searchQuery) => {
-        setLoading(true);
-        try {
-            // Valid states
-            const allowedStates = ['New York', 'New Jersey', 'Connecticut'];
-
-            // Fetch results with address details
-            const response = await axios.get(`https://nominatim.openstreetmap.org/search`, {
-                params: {
-                    q: searchQuery,
-                    format: 'json',
-                    addressdetails: 1,
-                    countrycodes: 'us',
-                    limit: 10
-                }
-            });
-
-            // Filter for allowed states (Normalize to check properly)
-            const filtered = response.data.filter(item => {
-                const state = item.address?.state;
-                return state && allowedStates.some(allowed => state.includes(allowed));
-            });
-
-            setResults(filtered);
-            setShowDropdown(true);
-        } catch (error) {
-            console.error("Search failed:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSelect = (item) => {
-        setQuery(item.display_name);
-        setShowDropdown(false);
-        setResults([]);
-
-        onLocationSelect({
-            lat: parseFloat(item.lat),
-            lon: parseFloat(item.lon),
-            displayName: item.display_name
-        });
-    };
+    // ... existing logic ...
 
     return (
-        <div className="absolute top-4 left-4 z-[1000] w-full max-w-md font-sans">
+        <div className={className}>
             <div className="relative">
                 <input
                     type="text"
