@@ -8,7 +8,52 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
     const [results, setResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
 
-    // ... existing logic ...
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            if (query.length > 2) {
+                searchAddress();
+            } else {
+                setResults([]);
+                setShowDropdown(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [query]);
+
+    const searchAddress = async () => {
+        setLoading(true);
+        try {
+            // Restrict to NY, NJ, CT using viewbox and bounded params
+            // Viewbox: [left, top, right, bottom] -> [lon, lat, lon, lat]
+            // Approx for NY/NJ/CT: -80, 45, -71, 39
+            const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+                params: {
+                    q: query,
+                    format: 'json',
+                    addressdetails: 1,
+                    limit: 5,
+                    viewbox: '-79.76,45.01,-71.78,38.93',
+                    bounded: 1
+                }
+            });
+            setResults(response.data);
+            setShowDropdown(true);
+        } catch (error) {
+            console.error('Search error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelect = (item) => {
+        setQuery(item.display_name);
+        setShowDropdown(false);
+        onLocationSelect({
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon)
+        });
+    };
 
     return (
         <div className={className}>
@@ -16,7 +61,7 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
                 <input
                     type="text"
                     placeholder="Enter address (NY, NJ, CT only)..."
-                    className="w-full pl-10 pr-4 py-3 rounded-lg shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/95 backdrop-blur-sm"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/95 backdrop-blur-sm text-gray-900"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
