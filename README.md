@@ -1,20 +1,47 @@
 # Roof Measurement Calculation
 
-## Setup
+## Currently Active APIs
 
-### Google Maps API Key
+- **Address Search**: [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) (Free, no API key required)
+- **Satellite Imagery**: [Esri World Imagery](https://www.esri.com/en-us/arcgis/products/arcgis-platform/services/world-imagery)
+- **Map Labels**: [Stamen Toner Labels](http://maps.stamen.com/toner-labels/)
 
-To use the address search features, you must provide a valid Google Maps API Key with the **Places API** and **Maps JavaScript API** enabled.
+---
 
-1.  Create a file named `.env` in the root directory.
-2.  Add your key:
-    ```
-    VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
-    ```
+## Technical Methodology
 
 This document outlines the current methodology used for estimating roof surface area and discusses future improvements for precision using LiDAR data.
 
 ## Current Calculation Methodology
+
+The application currently estimates roof area based on 2D satellite imagery combined with user-provided adjustment factors.
+
+### Formula
+
+1.  **Base Area Calculation (2D)**:
+    -   The user draws a polygon on the map.
+    -   We calculate the planar area of this polygon using `Turf.js`.
+    -   **Result**: $Area_{base}$ (sq ft)
+
+2.  **Pitch Adjustment (Slope)**:
+    -   Multiplied based on user-selected steepness (Default: x1.12).
+
+3.  **Waste Factor**:
+    -   Added for overlap and cutting (Default: 10%).
+
+---
+
+## Future Improvements
+
+### 1. Google Places Autocomplete (Optional)
+
+To improve address accuracy, you can optionally enable Google Places. 
+
+1. Create a `.env` file and add: `VITE_GOOGLE_MAPS_API_KEY=your_key_here`.
+2. Enable the **Places API** and **Maps JavaScript API** in Google Cloud Console.
+
+### 2. LiDAR / Solar API Integration (Roadmap)
+
 
 The application currently estimates roof area based on 2D satellite imagery combined with user-provided adjustment factors.
 
