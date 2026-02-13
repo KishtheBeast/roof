@@ -28,53 +28,51 @@ function App() {
     }, []);
 
     return (
-        <div className="h-screen w-screen relative overflow-hidden bg-gray-50">
+        <div className="h-screen w-screen relative overflow-hidden bg-brand-beige font-sans">
             {/* Landing Page Mode */}
             {!hasLocation && (
-                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-blue-900 via-slate-800 to-gray-900 text-white">
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517486430290-35657a918550?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center opacity-20 transform scale-105"></div>
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-brand-navy text-white">
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517486430290-35657a918550?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center opacity-10 grayscale transform scale-105"></div>
 
                     <div className="relative z-10 max-w-4xl px-4 text-center">
-                        <div className="inline-block px-4 py-1.5 mb-6 text-sm font-semibold tracking-wider text-blue-300 uppercase bg-blue-900/50 rounded-full border border-blue-700/50 backdrop-blur-sm">
-                            Professional Grade
+                        <div className="inline-block px-4 py-1.5 mb-8 text-[11px] font-bold tracking-[0.2em] text-brand-gold uppercase bg-white/5 rounded-full border border-white/10 backdrop-blur-sm font-mono">
+                            The Modern Professional Craftsman
                         </div>
-                        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200">
-                            Satellite Roof Measurement
+                        <h1 className="text-6xl md:text-8xl font-serif font-black leading-[0.9] tracking-tight mb-8">
+                            Satellite <span className="text-brand-gold italic">Roof</span> <br />Measurement
                         </h1>
-                        <p className="text-xl text-blue-100 mb-12 max-w-2xl mx-auto leading-relaxed">
+                        <p className="text-lg text-gray-300 mb-12 max-w-2xl mx-auto leading-relaxed font-sans">
                             Instantly measure roof area from high-resolution satellite imagery.
-                            Auto-detection, pitch adjustment, and detailed reports in seconds.
+                            Professional precision with automated pitch adjustment and detailed reporting.
                         </p>
 
                         <div className="relative w-full max-w-xl mx-auto mb-16">
                             <AddressSearch
                                 onLocationSelect={handleLocationSelect}
-                                className="w-full relative z-20 shadow-2xl"
+                                className="w-full relative z-20"
                             />
                             {/* Decorative glow */}
-                            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-lg blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                            <div className="absolute -inset-1 bg-brand-gold/20 rounded-lg blur-2xl opacity-50"></div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left mt-8">
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-transform hover:-translate-y-1">
-                                <Maximize className="w-8 h-8 text-blue-400 mb-4" />
-                                <h3 className="text-lg font-bold mb-2">Auto-Measure</h3>
-                                <p className="text-sm text-blue-100/70">Smart detection algorithms instantly outline and calculate roof surface area.</p>
+                            <div className="p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-all hover:bg-white/10">
+                                <Maximize className="w-8 h-8 text-brand-gold mb-4" />
+                                <h3 className="text-xl font-serif font-bold mb-2">Auto-Measure</h3>
+                                <p className="text-sm text-gray-400 leading-relaxed">Smart detection algorithms instantly outline and calculate roof surface area.</p>
                             </div>
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-transform hover:-translate-y-1">
-                                <Ruler className="w-8 h-8 text-blue-400 mb-4" />
-                                <h3 className="text-lg font-bold mb-2">Pitch & Waste</h3>
-                                <p className="text-sm text-blue-100/70">Adjust for roof slope and material waste factors for precise estimation.</p>
+                            <div className="p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-all hover:bg-white/10">
+                                <Ruler className="w-8 h-8 text-brand-gold mb-4" />
+                                <h3 className="text-xl font-serif font-bold mb-2">Pitch & Waste</h3>
+                                <p className="text-sm text-gray-400 leading-relaxed">Adjust for roof slope and material waste factors for precise estimation.</p>
                             </div>
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-transform hover:-translate-y-1">
-                                <Shield className="w-8 h-8 text-blue-400 mb-4" />
-                                <h3 className="text-lg font-bold mb-2">High-Res Imagery</h3>
-                                <p className="text-sm text-blue-100/70">Powered by Esri World Imagery for crystal clear views up to zoom level 22.</p>
+                            <div className="p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-all hover:bg-white/10">
+                                <Shield className="w-8 h-8 text-brand-gold mb-4" />
+                                <h3 className="text-xl font-serif font-bold mb-2">High-Res Imagery</h3>
+                                <p className="text-sm text-gray-400 leading-relaxed">Powered by Esri World Imagery for crystal clear views up to zoom level 22.</p>
                             </div>
                         </div>
                     </div>
-
-
                 </div>
             )}
 
@@ -94,14 +92,16 @@ function App() {
 
                         <AddressSearch
                             onLocationSelect={handleLocationSelect}
-                            className="absolute top-4 left-4 right-4 md:right-auto md:w-96 z-[5000] font-sans"
+                            className="absolute top-6 left-6 right-6 md:right-auto md:w-96 z-[5000]"
                         />
 
                         {/* Instructional Banner */}
-                        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[4000] w-max max-w-[90vw]">
-                            <div className="bg-blue-600/90 text-white px-4 py-2 rounded-full shadow-lg backdrop-blur-sm border border-blue-400/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-700">
-                                <Maximize className="w-4 h-4" />
-                                <span className="text-sm font-medium">Adjust the blue areas as needed to cover your full roof</span>
+                        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[4000] w-max max-w-[90vw]">
+                            <div className="bg-brand-navy/90 text-white px-6 py-3 rounded-full shadow-2xl backdrop-blur-md border border-white/10 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-700">
+                                <div className="bg-brand-gold rounded-full p-1">
+                                    <Maximize className="w-3 h-3 text-brand-navy" strokeWidth={3} />
+                                </div>
+                                <span className="text-xs font-mono tracking-wider font-bold uppercase">Adjust boundaries to cover full roof</span>
                             </div>
                         </div>
                     </div>

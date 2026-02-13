@@ -57,33 +57,33 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
 
     return (
         <div className={className}>
-            <div className="relative">
+            <div className="relative group">
                 <input
                     type="text"
-                    placeholder="Enter address..."
-                    className="w-full pl-10 pr-4 py-3 rounded-lg shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/95 backdrop-blur-sm text-gray-900"
+                    placeholder="Search address..."
+                    className="w-full pl-12 pr-4 py-4 rounded-xl shadow-2xl border border-brand-navy/5 focus:outline-none focus:ring-2 focus:ring-brand-gold bg-white/90 backdrop-blur-xl text-brand-navy font-bold placeholder:text-brand-navy/30 transition-all group-hover:bg-white"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-brand-gold w-5 h-5 transition-transform group-focus-within:scale-110" strokeWidth={3} />
                 {loading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-brand-gold border-b-transparent"></div>
                     </div>
                 )}
 
                 {/* Dropdown Results */}
                 {showDropdown && results.length > 0 && (
-                    <ul className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-100 max-h-60 overflow-y-auto divide-y divide-gray-100">
+                    <ul className="absolute top-full left-0 right-0 mt-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_20px_50px_rgba(26,26,46,0.2)] border border-brand-navy/5 max-h-80 overflow-y-auto divide-y divide-brand-navy/5 overflow-hidden font-mono text-[11px] font-bold">
                         {results.map((item) => (
                             <li
                                 key={item.place_id}
                                 onClick={() => handleSelect(item)}
-                                className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-start gap-3 transition-colors"
+                                className="px-5 py-4 hover:bg-brand-gold/5 cursor-pointer flex items-start gap-4 transition-all hover:pl-7"
                             >
-                                <MapPin className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
-                                <div className="text-sm text-gray-700 leading-snug">
+                                <MapPin className="w-4 h-4 text-brand-gold mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                <div className="text-brand-navy/80 leading-snug uppercase tracking-tight">
                                     {item.display_name}
                                 </div>
                             </li>
@@ -93,8 +93,8 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
 
                 {/* No Results Message */}
                 {showDropdown && query.length > 2 && !loading && results.length === 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-100 p-4 text-center text-gray-500 text-sm">
-                        No addresses found in NY, NJ, or CT.
+                    <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-2xl border border-brand-navy/5 p-6 text-center text-brand-navy/40 text-xs font-mono font-bold uppercase tracking-widest">
+                        Zero matches found in Service Area
                     </div>
                 )}
             </div>
