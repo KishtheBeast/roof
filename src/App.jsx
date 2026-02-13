@@ -96,6 +96,14 @@ function App() {
                             onLocationSelect={handleLocationSelect}
                             className="absolute top-4 left-4 right-4 md:right-auto md:w-96 z-[5000] font-sans"
                         />
+
+                        {/* Instructional Banner */}
+                        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[4000] w-max max-w-[90vw]">
+                            <div className="bg-blue-600/90 text-white px-4 py-2 rounded-full shadow-lg backdrop-blur-sm border border-blue-400/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-700">
+                                <Maximize className="w-4 h-4" />
+                                <span className="text-sm font-medium">Adjust the blue areas as needed to cover your full roof</span>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Bottom: Measurement Details Panel */}
