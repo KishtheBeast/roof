@@ -3,6 +3,7 @@ import RoofMap from './components/MapContainer';
 import AddressSearch from './components/AddressSearch';
 import MeasurementDisplay from './components/MeasurementDisplay';
 import { calculatePolygonArea } from './utils/calculateArea';
+import { fetchBuildingInsights } from './utils/solarApi';
 import { Ruler, Maximize, Shield, ArrowRight } from 'lucide-react';
 
 function App() {
@@ -10,12 +11,26 @@ function App() {
     const [mapZoom, setMapZoom] = useState(18);
     const [areaSqFt, setAreaSqFt] = useState(0);
     const [hasLocation, setHasLocation] = useState(false);
+    const [solarData, setSolarData] = useState(null);
 
-    const handleLocationSelect = React.useCallback((location) => {
+    const handleLocationSelect = React.useCallback(async (location) => {
         setMapCenter([location.lat, location.lon]);
         setMapZoom(21); // Zoom in very close for roof detail
-        setAreaSqFt(0); // Will be updated by auto-box
+        setAreaSqFt(0); // Reset area
         setHasLocation(true);
+
+        // Fetch professional LiDAR data
+        const data = await fetchBuildingInsights(location.lat, location.lon);
+        setSolarData(data);
+
+        // If we have solar data, skip manual input requirement
+        if (data && data.solarPotential) {
+            const SQM_TO_SQFT = 10.7639;
+            const totalRoofArea = data.solarPotential.wholeRoofStats?.areaMeters2 * SQM_TO_SQFT || 0;
+            if (totalRoofArea > 0) {
+                setAreaSqFt(Math.round(totalRoofArea));
+            }
+        }
     }, []);
 
     const handlePolygonUpdate = React.useCallback((layer) => {
@@ -23,6 +38,8 @@ function App() {
             const area = calculatePolygonArea(layer);
             setAreaSqFt(area);
         } else {
+            // If we don't have solar data, reset area on layer removal
+            // But if we have solar data, we might want to keep it or let user override
             setAreaSqFt(0);
         }
     }, []);
@@ -95,20 +112,27 @@ function App() {
                             className="absolute top-6 left-6 right-6 md:right-auto md:w-96 z-[5000]"
                         />
 
-                        {/* Instructional Banner */}
-                        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[4000] w-max max-w-[90vw]">
-                            <div className="bg-brand-navy/90 text-white px-6 py-3 rounded-full shadow-2xl backdrop-blur-md border border-white/10 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-700">
-                                <div className="bg-brand-gold rounded-full p-1">
-                                    <Maximize className="w-3 h-3 text-brand-navy" strokeWidth={3} />
+                        {/* Instructional Banner (Only if solar data is NOT present) */}
+                        {!solarData && (
+                            <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[4000] w-max max-w-[90vw]">
+                                <div className="bg-brand-navy/90 text-white px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border border-white/10 animate-in fade-in slide-in-from-top-4 duration-700">
+                                    <div className="flex items-start gap-3">
+                                        <div className="bg-brand-gold rounded-full p-1.5 mt-0.5">
+                                            <Maximize className="w-4 h-4 text-brand-navy" strokeWidth={3} />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-sm font-bold">Drag the Blue Box</span>
+                                            <span className="text-xs text-white/80">Pull corners to match your roof exactly</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span className="text-xs font-mono tracking-wider font-bold uppercase">Adjust boundaries to cover full roof</span>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Bottom: Measurement Details Panel */}
                     <div className="flex-none relative z-[1000]">
-                        <MeasurementDisplay areaSqFt={areaSqFt} />
+                        <MeasurementDisplay areaSqFt={areaSqFt} solarData={solarData} />
                     </div>
 
                 </div>
