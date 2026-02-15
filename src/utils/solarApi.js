@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const BASE_URL = 'https://solar.googleapis.com/v1/buildingInsights:findClosest';
+const BASE_URL = 'https://solar.googleapis.com/v1';
 const SQM_TO_SQFT = 10.7639;
 
 /**
@@ -17,7 +17,7 @@ export async function fetchBuildingInsights(lat, lng) {
     }
 
     try {
-        const response = await axios.get(BASE_URL, {
+        const response = await axios.get(`${BASE_URL}/buildingInsights:findClosest`, {
             params: {
                 'location.latitude': lat,
                 'location.longitude': lng,
@@ -28,6 +28,34 @@ export async function fetchBuildingInsights(lat, lng) {
         return response.data;
     } catch (error) {
         console.error('Error fetching Solar API data:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+/**
+ * Fetches data layers (RGB, DSM, etc.) for a given location using Google Solar API.
+ * @param {number} lat - Latitude
+ * @param {number} lng - Longitude
+ * @param {number} radius - Radius in meters (default 10)
+ * @returns {Promise<Object|null>} - Signed URLs for GeoTIFF layers or null
+ */
+export async function fetchSolarDataLayers(lat, lng, radius = 20) {
+    if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') return null;
+
+    try {
+        const response = await axios.get(`${BASE_URL}/dataLayers:get`, {
+            params: {
+                'location.latitude': lat,
+                'location.longitude': lng,
+                'radiusMeters': radius,
+                'view': 'IMAGERY_AND_ALL_FLUX_LAYERS', // or 'IMAGERY_AND_ANNUAL_FLUX_LAYERS'
+                key: API_KEY
+            }
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching Solar Data Layers:', error.response?.data || error.message);
         return null;
     }
 }

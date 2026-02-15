@@ -8,6 +8,7 @@ import { analyzeRoofWithClaude } from './utils/anthropicApi';
 import { Ruler, Maximize, Shield } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
+
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 // Initialize Google Maps API
@@ -29,7 +30,6 @@ async function initializeGoogleMaps() {
         // Load libraries sequentially to ensure correct initialization
         await importLibrary("places");
         await importLibrary("maps");
-        console.log('[Google Maps] Libraries loaded successfully');
     } catch (e) {
         console.error('[Google Maps] Library Load Failure:', e);
     }
@@ -47,6 +47,8 @@ function App() {
     const [aiMeasurements, setAiMeasurements] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [suggestedFootprint, setSuggestedFootprint] = useState(null);
+    const [selectedAddress, setSelectedAddress] = useState('');
+    const currentPolygonRef = React.useRef(null);
 
     const handleLocationSelect = React.useCallback(async (location) => {
         setMapCenter([location.lat, location.lon]);
@@ -54,82 +56,122 @@ function App() {
         setAreaSqFt(0); // Reset area
         setSuggestedFootprint(null);
         setHasLocation(true);
+        setSelectedAddress(location.address || '');
 
-        // Fetch professional LiDAR data
+        // Fetch professional LiDAR data (Standard JSON only, no heavy imagery)
         const data = await fetchBuildingInsights(location.lat, location.lon);
         setSolarData(data);
 
-        // Auto-run AI analysis if solar data is available
-        if (data) {
-            setIsAnalyzing(true);
-            try {
-                // Wait for map tiles to stabilize before capturing
-                await new Promise(resolve => setTimeout(resolve, 3000));
-
-                let imageBase64 = null;
-                let mapBounds = null;
-                const mapElement = document.querySelector('.leaflet-container');
-
-                if (mapElement) {
-                    try {
-                        // Capture map bounds at the time of screenshot
-                        // This allows us to map normalized (0-1) coordinates back to Lat/Lng
-                        const mapInstance = window.L?.DomUtil.get(mapElement)?._leaflet_map;
-                        if (mapInstance) {
-                            const bounds = mapInstance.getBounds();
-                            mapBounds = {
-                                north: bounds.getNorth(),
-                                south: bounds.getSouth(),
-                                east: bounds.getEast(),
-                                west: bounds.getWest()
-                            };
-                        }
-
-                        const canvas = await html2canvas(mapElement, {
-                            useCORS: true,
-                            allowTaint: true,
-                            backgroundColor: null,
-                            logging: false
-                        });
-                        imageBase64 = canvas.toDataURL('image/png');
-                        console.log('[Capture] Map screenshot generated successfully');
-                    } catch (captureErr) {
-                        console.error('[Capture] Failed to generate map screenshot:', captureErr);
-                    }
-                }
-
-                const processed = processSolarData(data);
-                const aiResult = await analyzeRoofWithClaude(processed, data, imageBase64);
-                setAiMeasurements(aiResult);
-
-                // [AI MOVE BOX] Map normalized footprint (0-1) to Lat/Lng
-                if (aiResult?.normalizedFootprint && mapBounds) {
-                    const latRange = mapBounds.north - mapBounds.south;
-                    const lngRange = mapBounds.east - mapBounds.west;
-
-                    const latsLngs = aiResult.normalizedFootprint.map(p => [
-                        mapBounds.north - (p.y * latRange), // y=0 is north
-                        mapBounds.west + (p.x * lngRange)   // x=0 is west
-                    ]);
-                    setSuggestedFootprint(latsLngs);
-                    console.log('[AI] Footprint refined and mapped to Lat/Lng');
-                }
-
-                // [AUTO-SET] Automatically populate the ground area if AI verified it
-                if (aiResult?.estimatedGroundAreaSqFt) {
-                    setAreaSqFt(aiResult.estimatedGroundAreaSqFt);
-                } else if (processed.wholeRoofStats?.groundAreaSqFt) {
-                    setAreaSqFt(processed.wholeRoofStats.groundAreaSqFt);
-                }
-            } catch (err) {
-                console.error('AI Analysis failed:', err);
-            } finally {
-                setIsAnalyzing(false);
-            }
-        }
+        // NOTE: High-res Solar Layers (RGB/DSM) disabled for performance.
+        // We rely on the user's manual highlight and the standard map screenshot.
     }, []);
 
+    // NOTE: We no longer auto-run AI here. 
+    // User must confirm selection with "Analyze Selection" button.
+    const triggerAiAnalysis = React.useCallback(async () => {
+        if (!solarData || !currentPolygonRef.current) return;
+
+        setIsAnalyzing(true);
+        try {
+            const mapElement = document.querySelector('.leaflet-container');
+            if (!mapElement) return;
+
+            // 1. Capture full map screenshot
+            const canvas = await html2canvas(mapElement, {
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: null,
+                logging: false
+            });
+
+            // 2. Get map instance and poly bounds in pixel space
+            const mapInstance = window.L?.DomUtil.get(mapElement)?._leaflet_map;
+            let finalImage = canvas.toDataURL('image/png');
+            let cropOffsets = { x: 0, y: 0, width: canvas.width, height: canvas.height };
+            let mapBounds = null;
+
+            if (mapInstance && currentPolygonRef.current) {
+                const latlngs = currentPolygonRef.current.getLatLngs()[0];
+                const points = latlngs.map(ll => mapInstance.latLngToContainerPoint(ll));
+
+                const minX = Math.min(...points.map(p => p.x));
+                const maxX = Math.max(...points.map(p => p.x));
+                const minY = Math.min(...points.map(p => p.y));
+                const maxY = Math.max(...points.map(p => p.y));
+
+                // Add some padding (e.g., 20% of width/height)
+                const w = maxX - minX;
+                const h = maxY - minY;
+                const padding = Math.max(w, h) * 0.2;
+
+                const cropX = Math.max(0, minX - padding);
+                const cropY = Math.max(0, minY - padding);
+                const cropW = Math.min(canvas.width - cropX, w + padding * 2);
+                const cropH = Math.min(canvas.height - cropY, h + padding * 2);
+
+                cropOffsets = { x: cropX, y: cropY, width: cropW, height: cropH };
+
+                // 3. Create cropped canvas
+                const croppedCanvas = document.createElement('canvas');
+                croppedCanvas.width = cropW;
+                croppedCanvas.height = cropH;
+                const ctx = croppedCanvas.getContext('2d');
+                ctx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+                finalImage = croppedCanvas.toDataURL('image/png');
+
+                // Get map bounds for later coordinate conversion
+                const bounds = mapInstance.getBounds();
+                mapBounds = {
+                    north: bounds.getNorth(),
+                    south: bounds.getSouth(),
+                    east: bounds.getEast(),
+                    west: bounds.getWest()
+                };
+            }
+
+            const processed = processSolarData(solarData);
+
+            // Use the standard map screenshot (finalImage)
+            const aiResult = await analyzeRoofWithClaude(processed, solarData, finalImage, selectedAddress);
+            setAiMeasurements(aiResult);
+
+            // 5. Map results back (accounting for crop)
+            if (aiResult?.normalizedFootprint && mapBounds) {
+                // Adjust normalized footprint from cropped space back to full map space
+                const latRange = mapBounds.north - mapBounds.south;
+                const lngRange = mapBounds.east - mapBounds.west;
+
+                const latsLngs = aiResult.normalizedFootprint.map(p => {
+                    // p is normalized (0-1) within the CROPPED image
+                    // Convert to pixel coordinates in original canvas
+                    const pxX = cropOffsets.x + (p.x * cropOffsets.width);
+                    const pxY = cropOffsets.y + (p.y * cropOffsets.height);
+
+                    // Convert pixel to normalized map coordinate (0-1)
+                    const normX = pxX / canvas.width;
+                    const normY = pxY / canvas.height;
+
+                    return [
+                        mapBounds.north - (normY * latRange),
+                        mapBounds.west + (normX * lngRange)
+                    ];
+                });
+                setSuggestedFootprint(latsLngs);
+            }
+
+            if (aiResult?.estimatedGroundAreaSqFt) {
+                setAreaSqFt(aiResult.estimatedGroundAreaSqFt);
+            }
+        } catch (err) {
+            console.error('AI Analysis failed:', err);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    }, [solarData, selectedAddress]);
+
+
     const handlePolygonUpdate = React.useCallback((layer) => {
+        currentPolygonRef.current = layer;
         if (layer) {
             const area = calculatePolygonArea(layer);
             setAreaSqFt(area);
@@ -197,8 +239,8 @@ function App() {
             {hasLocation && (
                 <div className="flex flex-col h-full w-full">
 
-                    {/* Top: Map Section */}
-                    <div className="flex-1 relative w-full isolate">
+                    {/* Top: Map Section (70%) */}
+                    <div className="h-[70%] relative w-full isolate border-b-4 border-brand-navy">
                         <div className="absolute inset-0">
                             <RoofMap
                                 center={mapCenter}
@@ -209,10 +251,35 @@ function App() {
                             />
                         </div>
 
-                        <AddressSearch
-                            onLocationSelect={handleLocationSelect}
-                            className="absolute top-6 left-6 right-6 md:right-auto md:w-96 z-[5000]"
-                        />
+                        {/* Address Search Header */}
+                        <div className="absolute top-6 left-6 right-6 z-[2000] flex items-center gap-3">
+                            <div className="flex-1">
+                                <AddressSearch onLocationSelect={handleLocationSelect} className="relative w-full" />
+                            </div>
+
+                            {hasLocation && solarData && (
+                                <div className="flex items-center gap-2">
+                                    {!areaSqFt ? (
+                                        <div className="flex items-center gap-2 px-6 py-4 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 text-white animate-pulse">
+                                            <Maximize className="w-4 h-4 text-brand-gold" />
+                                            <span className="text-sm font-bold tracking-wide">Step 1: Draw a box around the roof</span>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={triggerAiAnalysis}
+                                            disabled={isAnalyzing}
+                                            className={`px-6 py-4 rounded-3xl font-bold text-sm tracking-wide shadow-2xl transition-all duration-300 flex items-center gap-2 group ${isAnalyzing
+                                                ? 'bg-brand-navy/50 text-white/50 cursor-not-allowed'
+                                                : 'bg-brand-gold text-brand-navy hover:scale-105 active:scale-95'
+                                                }`}
+                                        >
+                                            <Shield className={`w-4 h-4 ${isAnalyzing ? 'animate-pulse' : 'group-hover:rotate-12 transition-transform'}`} />
+                                            {isAnalyzing ? 'Analyzing Highlight...' : 'Step 2: Analyze Highlight'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Developer Tools */}
                         <div className="absolute top-6 right-6 z-[5000] flex gap-2">
@@ -224,27 +291,10 @@ function App() {
                                 [DEV] MANUAL INIT
                             </button>
                         </div>
-
-                        {/* Instructional Banner (Only if solar data is NOT present) */}
-                        {!solarData && (
-                            <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[4000] w-max max-w-[90vw]">
-                                <div className="bg-brand-navy/90 text-white px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border border-white/10 animate-in fade-in slide-in-from-top-4 duration-700">
-                                    <div className="flex items-start gap-3">
-                                        <div className="bg-brand-gold rounded-full p-1.5 mt-0.5">
-                                            <Maximize className="w-4 h-4 text-brand-navy" strokeWidth={3} />
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-sm font-bold">Drag the Blue Box</span>
-                                            <span className="text-xs text-white/80">Pull corners to match your roof exactly</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
-                    {/* Bottom: Measurement Details Panel */}
-                    <div className="flex-none relative z-[1000]">
+                    {/* Bottom: Measurement Details Panel (30%) */}
+                    <div className="h-[30%] relative z-10 w-full bg-brand-beige">
                         <MeasurementDisplay
                             areaSqFt={areaSqFt}
                             solarData={solarData}

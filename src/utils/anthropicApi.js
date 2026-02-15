@@ -8,14 +8,21 @@ const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
  * @param {Object} rawSolarData - Raw API response for deeper geometric context if needed
  * @returns {Promise<Object|null>} - Estimated linear measurements or null
  */
-export async function analyzeRoofWithClaude(solarData, rawSolarData, imageBase64 = null) {
+export async function analyzeRoofWithClaude(solarData, rawSolarData, imageBase64 = null, address = '') {
     // The API key is now handled server-side by the Vite proxy
 
     const prompt = `
 You are a professional roofing estimator and 3D geometry engine. Analyze the following roof LIDAR data ${imageBase64 ? 'and the provided satellite imagery ' : ''}from the Google Solar API.
-Your goal is to provide a comprehensive structural analysis, detailed linear measurements, and a refined 2D map footprint.
 
-${imageBase64 ? 'I have provided a satellite image of the roof. Use it to trace the ridges, valleys, and rakes visually while cross-referencing with the LIDAR geometry. CRITICAL: Also provide the "normalizedFootprint" which is an array of 4-8 coordinates (x, y) where 0,0 is top-left and 1,1 is bottom-right of the provided image, perfectly outlining the main house structure.' : ''}
+TARGET ADDRESS: ${address}
+CRITICAL: Only identify and analyze the ROOF part of the house located at EXACTLY this address.
+
+Your goal is to provide a comprehensive structural analysis, detailed linear measurements, and a refined 2D map footprint for the target roof.
+
+${imageBase64 ? `SATELLITE IMAGE ANALYSIS:
+1. Locate the specific house at "${address}" in the provided image.
+2. Use visual cues to trace the ridges, valleys, and rakes for ONLY the roof of this house.
+3. Provide the "normalizedFootprint" which is an array of 4-8 coordinates (x, y) where 0,0 is top-left and 1,1 is bottom-right of the image, perfectly outlining only the ROOF portion of the target house.` : ''}
 
 ROOF GEOMETRY DATA:
 ${JSON.stringify(solarData, null, 2)}
@@ -54,12 +61,6 @@ RETURN ONLY A JSON OBJECT with these exact keys:
 }
 `;
 
-    console.log('[AI] Starting analysis with Claude...', {
-        facets: solarData.facetCount,
-        area: solarData.totalAreaSqFt,
-        hasImage: !!imageBase64
-    });
-
     try {
         const messages = [
             {
@@ -97,16 +98,13 @@ RETURN ONLY A JSON OBJECT with these exact keys:
         });
 
         const content = response.data.content[0].text;
-        console.log('[AI] Received response from Claude');
 
         // Extract JSON if Claude adds conversational filler
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
-            console.log('[AI] Successfully parsed measurements:', parsed);
             return parsed;
         }
-        console.warn('[AI] Could not find JSON in Claude response:', content);
         return null;
     } catch (error) {
         const errorData = error.response?.data;

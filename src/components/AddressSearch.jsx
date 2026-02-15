@@ -24,11 +24,18 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
         if (!window.google || !window.google.maps.places) return;
         setLoading(true);
         try {
-            const { AutocompleteSuggestion } = await window.google.maps.importLibrary("places");
+            const { AutocompleteSuggestion, AutocompleteSessionToken } = await window.google.maps.importLibrary("places");
+
+            // Re-use session token for better billing/efficiency
+            if (!window.google.autocompleteSessionToken) {
+                window.google.autocompleteSessionToken = new AutocompleteSessionToken();
+            }
 
             const request = {
                 input: query,
                 includedRegionCodes: ['us'],
+                includedPrimaryTypes: ['geocode'], // Focus on addresses/locations
+                sessionToken: window.google.autocompleteSessionToken
             };
 
             const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
@@ -51,8 +58,14 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
         setQuery(item.placePrediction.text.text);
         setShowDropdown(false);
 
+        // Reset session token for the next search session
+        if (window.google) {
+            window.google.autocompleteSessionToken = null;
+        }
+
         try {
             const { Place } = await window.google.maps.importLibrary("places");
+            const address = item.placePrediction.text.text;
             const place = new Place({
                 id: item.placePrediction.placeId,
             });
@@ -62,7 +75,8 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
             if (place.location) {
                 onLocationSelect({
                     lat: place.location.lat(),
-                    lon: place.location.lng()
+                    lon: place.location.lng(),
+                    address: address
                 });
             }
         } catch (error) {
