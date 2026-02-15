@@ -20,9 +20,9 @@ CRITICAL: Only identify and analyze the ROOF part of the house located at EXACTL
 Your goal is to provide a comprehensive structural analysis, detailed linear measurements, and a refined 2D map footprint for the target roof.
 
 ${imageBase64 ? `SATELLITE IMAGE ANALYSIS:
-1. Locate the specific house at "${address}" in the provided image.
-2. Use visual cues to trace the ridges, valleys, and rakes for ONLY the roof of this house.
-3. Provide the "normalizedFootprint" which is an array of 4-8 coordinates (x, y) where 0,0 is top-left and 1,1 is bottom-right of the image, perfectly outlining only the ROOF portion of the target house.` : ''}
+1. LOCATE TARGET: The house at "${address}" is located EXACTLY IN THE CENTER of the provided image.
+2. PRECISION: This is high-resolution raw imagery from the Solar API. Use visual cues to trace the ridges, valleys, and rakes for ONLY the central house.
+3. OUTPUT: Provide the "normalizedFootprint" which is an array of 4-8 coordinates (x, y) where 0,0 is top-left and 1,1 is bottom-right of the image, perfectly outlining only the ROOF portion of the central house.` : ''}
 
 ROOF GEOMETRY DATA:
 ${JSON.stringify(solarData, null, 2)}
@@ -55,7 +55,6 @@ RETURN ONLY A JSON OBJECT with these exact keys:
   "estimatedGroundAreaSqFt": number,
   "estimatedSurfaceAreaSqFt": number,
   "complexity": "SIMPLE" | "MODERATE" | "COMPLEX",
-  "normalizedFootprint": Array<{x: number, y: number}>,
   "confidenceScore": number (0-1),
   "estimationNotes": string
 }

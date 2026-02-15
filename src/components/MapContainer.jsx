@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon, ImageOverlay, Pane } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
@@ -20,52 +20,40 @@ if (typeof window !== 'undefined') {
 }
 
 // Component to handle drawing logic
-function DrawControl({ center, solarData, suggestedFootprint, onCreated, onDeleted, onEdited }) {
+function DrawControl({ center, suggestedFootprint, onCreated, onDeleted, onEdited }) {
     const map = useMap();
     const featureGroupRef = useRef(new L.FeatureGroup());
     const drawControlRef = useRef(null);
-    const drawHandlerRef = useRef(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [hasPolygon, setHasPolygon] = useState(false);
-
-    // Attach map instance to DOM for App.jsx access
-    useEffect(() => {
-        if (map && map._container) {
-            map._container._leaflet_map = map;
-        }
-    }, [map]);
 
     // 1. Initialize Draw Control and Event Listeners
     useEffect(() => {
         map.addLayer(featureGroupRef.current);
 
+        // Define custom style for the drawing (Brand Gold)
         const drawStyle = {
-            color: '#eab308', // Yellow-500 (Highlighter Look)
-            weight: 4,
-            opacity: 0.8,
-            fillColor: '#facc15', // Yellow-400
-            fillOpacity: 0.4,
-            dashArray: '', // Solid line for "paint" feel
+            color: '#fbbf24', // Brand Gold
+            weight: 3,
+            opacity: 1,
+            fillColor: '#fbbf24',
+            fillOpacity: 0.2,
         };
 
+        // Initialize draw control
         const drawControl = new L.Control.Draw({
             edit: {
                 featureGroup: featureGroupRef.current,
-                remove: false, // We handle deletion with a custom button
-                edit: false, // We don't want to edit existing shapes
+                remove: true,
             },
             draw: {
                 marker: false,
                 circle: false,
                 circlemarker: false,
                 polyline: false,
-                polygon: false,
-                rectangle: {
+                rectangle: false,
+                polygon: {
                     allowIntersection: false,
                     showArea: true,
-                    shapeOptions: drawStyle,
-                    metric: false, // Use imperial
-                    repeatMode: false
+                    shapeOptions: drawStyle
                 },
             },
         });
@@ -73,30 +61,7 @@ function DrawControl({ center, solarData, suggestedFootprint, onCreated, onDelet
         map.addControl(drawControl);
         drawControlRef.current = drawControl;
 
-        // We don't add the toolbar control to the map anymore (headless mode)
-        // But we need the options for our manual handler
-        const rectangleOptions = {
-            allowIntersection: false,
-            showArea: true,
-            shapeOptions: drawStyle,
-            metric: false
-        };
-
-        // Initialize the Draw.Rectangle handler manually for "make a box"
-        // Rectangle tool is easier: drag from corner to corner
-        drawHandlerRef.current = new L.Draw.Rectangle(map, rectangleOptions);
-
-        // Edit handler (using standard Control.Draw for edit features if needed, 
-        // but since we want "erase only", we might skip full edit control)
-        // Actually, let's keep a hidden edit control for internal logic if needed, 
-        // or just handle clearing manually.
-
-        // AUTO-ENABLE DRAW on load if no polygon exists
-        if (!hasPolygon && !suggestedFootprint) {
-            drawHandlerRef.current.enable();
-            setIsDrawing(true);
-        }
-
+        // Custom handler for real-time updates
         const handleUpdate = (e) => {
             const layers = featureGroupRef.current.getLayers();
             if (layers.length > 0) {
@@ -109,113 +74,117 @@ function DrawControl({ center, solarData, suggestedFootprint, onCreated, onDelet
             }
         };
 
+        // Event listeners
         map.on(L.Draw.Event.CREATED, (e) => {
             featureGroupRef.current.clearLayers();
             const layer = e.layer;
             featureGroupRef.current.addLayer(layer);
-            setHasPolygon(true);
-            setIsDrawing(false);
 
             if (onCreated) onCreated(layer);
 
-            // Enable direct editing on the layer
-            // layer.editing.enable(); 
-            // Better to let user erase and redraw for simplicity as per request
+            if (layer.editing) {
+                layer.editing.enable();
+            }
         });
 
         map.on(L.Draw.Event.EDITED, (e) => {
             if (onEdited) onEdited(e.layers);
         });
 
-        // Loop manual enable if we want continuous drawing? No, just once.
+        map.on('draw:editmove', handleUpdate);
+        map.on('draw:editvertex', handleUpdate);
+
+        map.on(L.Draw.Event.DELETED, (e) => {
+            if (onDeleted) onDeleted(e.layers);
+        });
 
         return () => {
             if (map) {
+                map.removeControl(drawControl);
                 map.removeLayer(featureGroupRef.current);
-                if (drawHandlerRef.current) drawHandlerRef.current.disable();
                 map.off(L.Draw.Event.CREATED);
                 map.off(L.Draw.Event.EDITED);
+                map.off('draw:editmove');
+                map.off('draw:editvertex');
+                map.off(L.Draw.Event.DELETED);
             }
         };
-    }, [map]); // Run once on mount (map ready)
+    }, [map, onEdited, onCreated, onDeleted]);
 
-    // 2. Handle AI Suggested Footprint (AI MOVE BOX)
+    // 2. Handle Auto-Box Creation on Center Change (Search)
     useEffect(() => {
-        if (!suggestedFootprint || suggestedFootprint.length < 3) return;
+        if (!center && !suggestedFootprint) return;
 
         featureGroupRef.current.clearLayers();
+
+        let initialBox;
+        if (suggestedFootprint && suggestedFootprint.length > 0) {
+            // Use high-precision building footprint from Solar API
+            initialBox = suggestedFootprint;
+        } else if (center) {
+            // Fallback to generic box around center
+            const offset = 0.00012;
+            initialBox = [
+                [center[0] + offset, center[1] - offset],
+                [center[0] + offset, center[1] + offset],
+                [center[0] - offset, center[1] + offset],
+                [center[0] - offset, center[1] - offset]
+            ];
+        } else {
+            return;
+        }
+
         const drawStyle = {
-            color: '#3b82f6',
+            color: '#fbbf24',
             weight: 3,
             opacity: 1,
-            fillColor: '#3b82f6',
+            fillColor: '#fbbf24',
             fillOpacity: 0.2,
         };
 
-        const polygon = L.polygon(suggestedFootprint, drawStyle);
+        const polygon = L.polygon(initialBox, drawStyle);
         featureGroupRef.current.addLayer(polygon);
-        setHasPolygon(true);
-
-        // If suggested footprint added, disable draw tool
-        if (drawHandlerRef.current) drawHandlerRef.current.disable();
-        setIsDrawing(false);
 
         if (onCreated) onCreated(polygon);
 
-        if (onEdited) {
-            const mockLayers = { eachLayer: (cb) => cb(polygon) };
-            onEdited(mockLayers);
+        if (polygon.editing) {
+            polygon.editing.enable();
         }
-    }, [suggestedFootprint, onCreated, onEdited]);
 
-    // Custom Erase Handler
-    const handleErase = () => {
-        featureGroupRef.current.clearLayers();
-        setHasPolygon(false);
-        if (onDeleted) onDeleted(); // Clears state in parent
+        // IMPORTANT: Only re-initialize when the location source changes to prevent reset during manual editing
+    }, [center?.[0], center?.[1], JSON.stringify(suggestedFootprint)]);
 
-        // Re-enable drawing immediately
-        if (drawHandlerRef.current) {
-            drawHandlerRef.current.enable();
-            setIsDrawing(true);
-        }
-    };
-
-    // Render Erase Button (Custom Control)
-    if (!hasPolygon) return null;
-
-    return (
-        <div className="leaflet-bottom leaflet-right" style={{ marginBottom: '20px', marginRight: '10px', pointerEvents: 'auto' }}>
-            <div className="leaflet-control">
-                <button
-                    onClick={(e) => {
-                        L.DomEvent.stopPropagation(e); // Prevent map click
-                        handleErase();
-                    }}
-                    className="bg-white text-red-600 px-4 py-2 rounded-lg shadow-xl font-bold text-sm flex items-center gap-2 hover:bg-red-50 border border-red-100 transition-all transform hover:scale-105"
-                >
-                    <Eraser className="w-4 h-4" />
-                    Erase Highlight
-                </button>
-            </div>
-        </div>
-    );
+    return null;
 }
 
+// Viewfinder component removed in favor of native Leaflet Draw controls
+
 // Component to update map view when props change
-function ChangeView({ center, zoom }) {
+function ChangeView({ center, zoom, bounds }) {
     const map = useMap();
     useEffect(() => {
-        map.flyTo(center, zoom, {
-            animate: true,
-            duration: 1.5
-        });
-    }, [center, zoom, map]);
+        // Ensure map knows its actual size (fixes gray bars/misalignment)
+        map.invalidateSize();
+
+        if (bounds) {
+            map.fitBounds(bounds, {
+                padding: [5, 5], // Tighter fit for Studio mode
+                maxZoom: 22,
+                animate: true,
+                duration: 1.5
+            });
+        } else {
+            map.flyTo(center, zoom, {
+                animate: true,
+                duration: 1.5
+            });
+        }
+    }, [center, zoom, bounds, map]);
     return null;
 }
 
 // Map Component
-export default function RoofMap({ center, zoom, solarData, suggestedFootprint, onPolygonUpdate }) {
+export default function RoofMap({ center, zoom, solarData, suggestedFootprint, onPolygonUpdate, rgbOverlay, isAnalysisMode }) {
     // Stable callbacks to prevent unnecessary re-renders of DrawControl
     const handleCreated = onPolygonUpdate;
 
@@ -228,45 +197,86 @@ export default function RoofMap({ center, zoom, solarData, suggestedFootprint, o
     }, [onPolygonUpdate]);
 
     return (
-        <MapContainer center={center} zoom={zoom} zoomControl={false} attributionControl={false} style={{ height: '100%', width: '100%' }}>
-            <ChangeView center={center} zoom={zoom} />
-            <TileLayer
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                maxNativeZoom={19}
-                maxZoom={22}
-                crossOrigin="anonymous"
-            />
+        <div className={`h-full w-full transition-all duration-700 ${isAnalysisMode ? 'p-4 bg-brand-navy' : ''}`}>
+            <div className={`h-full w-full relative overflow-hidden transition-all duration-700 ${isAnalysisMode ? 'rounded-[2rem] border-[12px] border-brand-gold/20 shadow-[0_0_100px_rgba(251,191,36,0.15)] ring-1 ring-brand-gold/30' : ''}`}>
+                <MapContainer
+                    center={center}
+                    zoom={zoom}
+                    zoomControl={false}
+                    attributionControl={false}
+                    dragging={true}
+                    scrollWheelZoom={true}
+                    doubleClickZoom={true}
+                    boxZoom={true}
+                    keyboard={true}
+                    touchZoom={true}
+                    style={{ height: '100%', width: '100%', backgroundColor: '#0f172a' }} // brand-navy background
+                >
+                    <ChangeView center={center} zoom={zoom} bounds={rgbOverlay?.bounds} />
 
-            <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-                opacity={0.8}
-                crossOrigin="anonymous"
-            />
+                    {/* Standard Map Tiles - ONLY loaded if no high-res solar data exists */}
+                    {!rgbOverlay && (
+                        <>
+                            <TileLayer
+                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                maxNativeZoom={19}
+                                maxZoom={22}
+                                crossOrigin="anonymous"
+                            />
 
-            <DrawControl
-                center={center}
-                solarData={solarData}
-                suggestedFootprint={suggestedFootprint}
-                onCreated={handleCreated}
-                onEdited={handleEdited}
-                onDeleted={handleDeleted}
-            />
+                            <TileLayer
+                                url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+                                opacity={0.8}
+                                crossOrigin="anonymous"
+                            />
+                        </>
+                    )}
 
-            {/* AI Automated House Highlight (Golden Dashed Box) - Only if no manual polygon? Or overlay? */}
-            {/* Keeping it as reference for now unless overridden */}
-            {solarData?.boundingPoly?.vertices && !suggestedFootprint && (
-                <Polygon
-                    positions={solarData.boundingPoly.vertices.map(v => [v.latitude, v.longitude])}
-                    pathOptions={{
-                        color: '#fbbf24', // brand-gold
-                        weight: 2,
-                        opacity: 0.5,
-                        fillColor: 'transparent',
-                        fillOpacity: 0,
-                        dashArray: '5, 10'
-                    }}
-                />
-            )}
-        </MapContainer>
+                    {/* High-Res Solar API RGB Overlay - Rendered in a custom pane BELOW the overlay pane (zIndex 400) */}
+                    {rgbOverlay && (
+                        <Pane name="solarPane" style={{ zIndex: 399 }}>
+                            <ImageOverlay
+                                url={rgbOverlay.url}
+                                bounds={rgbOverlay.bounds}
+                                opacity={1}
+                                interactive={false}
+                            />
+                        </Pane>
+                    )}
+
+                    <DrawControl
+                        center={center}
+                        suggestedFootprint={suggestedFootprint}
+                        onCreated={handleCreated}
+                        onEdited={handleEdited}
+                        onDeleted={handleDeleted}
+                    />
+
+
+                    {/* Native drawing controls handles the highlight box functionality */}
+
+                    {/* AI Automated House Highlight (Golden Dashed Box) - Only if no manual polygon? Or overlay? */}
+                    {/* Keeping it as reference for now unless overridden */}
+                    {solarData?.boundingPoly?.vertices && !suggestedFootprint && (
+                        <Polygon
+                            positions={solarData.boundingPoly.vertices.map(v => [v.latitude, v.longitude])}
+                            pathOptions={{
+                                color: '#fbbf24', // brand-gold
+                                weight: 2,
+                                opacity: 0.5,
+                                fillColor: 'transparent',
+                                fillOpacity: 0,
+                                dashArray: '5, 10'
+                            }}
+                        />
+                    )}
+                </MapContainer>
+
+                {/* Studio Vignette Overlay */}
+                {isAnalysisMode && (
+                    <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_rgba(15,23,42,0.8)] z-[1000]"></div>
+                )}
+            </div>
+        </div>
     );
 }
