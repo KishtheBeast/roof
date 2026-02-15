@@ -19,7 +19,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component to handle drawing logic
-function DrawControl({ center, onCreated, onDeleted, onEdited }) {
+function DrawControl({ center, solarData, onCreated, onDeleted, onEdited }) {
     const map = useMap();
     const featureGroupRef = useRef(new L.FeatureGroup());
     const drawControlRef = useRef(null);
@@ -141,8 +141,9 @@ function DrawControl({ center, onCreated, onDeleted, onEdited }) {
             polygon.editing.enable();
         }
 
-        // IMPORTANT: Removed onCreated from dependency array to prevent reset on edit
-    }, [center[0], center[1]]);
+        // IMPORTANT: Added solarData to dependencies so that clearing solar data (Manual Init)
+        // re-triggers the box creation.
+    }, [center[0], center[1], solarData]);
 
     return null;
 }
@@ -160,7 +161,7 @@ function ChangeView({ center, zoom }) {
 }
 
 // Map Component
-export default function RoofMap({ center, zoom, onPolygonUpdate }) {
+export default function RoofMap({ center, zoom, solarData, onPolygonUpdate }) {
     // Stable callbacks to prevent unnecessary re-renders of DrawControl
     const handleCreated = onPolygonUpdate;
 
@@ -188,6 +189,7 @@ export default function RoofMap({ center, zoom, onPolygonUpdate }) {
 
             <DrawControl
                 center={center}
+                solarData={solarData}
                 onCreated={handleCreated}
                 onEdited={handleEdited}
                 onDeleted={handleDeleted}

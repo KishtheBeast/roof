@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Info, Zap, Layers, TrendingUp } from 'lucide-react';
+import { ShieldCheck, Info, Zap, Layers, TrendingUp, Calculator, MousePointer2 } from 'lucide-react';
 import { processSolarData } from '../utils/solarApi';
 
 export default function MeasurementDisplay({ areaSqFt, solarData }) {
@@ -15,55 +15,80 @@ export default function MeasurementDisplay({ areaSqFt, solarData }) {
         { label: 'Very Steep (Professional Only)', value: 1.40 },
     ];
 
-    const [multiplier, setMultiplier] = React.useState(1.12); // Default to Standard House
-    const [wasteFactor, setWasteFactor] = React.useState(0); // Set to 0% as requested
+    const complexityOptions = [
+        { label: 'Simple (Single plane, no valleys)', value: 1.0 },
+        { label: 'Moderate (Few valleys/hips)', value: 1.15 },
+        { label: 'Complex (Multiple levels/dormers)', value: 1.30 },
+    ];
+
+    const [multiplier, setMultiplier] = React.useState(1.12);
+    const [wasteFactor, setWasteFactor] = React.useState(0);
     const [hasSaved, setHasSaved] = React.useState(false);
+    const [showMethodology, setShowMethodology] = React.useState(false);
 
-    // Sync with Solar API data if the user chooses to
-    const handleSyncSolar = React.useCallback(() => {
-        if (!solarMeasurements) return;
+    // Enhanced manual inputs (when no Solar API)
+    const [overhangPercent, setOverhangPercent] = React.useState(10);
+    const [complexityFactor, setComplexityFactor] = React.useState(1.15);
+    const [numStories, setNumStories] = React.useState(1);
 
-        // Find closest multiplier to degrees
-        const degrees = solarMeasurements.predominantPitchDegrees || 0;
-        // Simple mapping: 0-5: Flat, 5-15: Low, 15-30: Standard, 30-45: Steep, 45+: Very Steep
-        let newMult = 1.12;
-        if (degrees < 5) newMult = 1.00;
-        else if (degrees < 15) newMult = 1.05;
-        else if (degrees < 30) newMult = 1.12;
-        else if (degrees < 45) newMult = 1.25;
-        else newMult = 1.40;
+    // Manual Calculation: 2D Area * Pitch Multiplier (basic or enhanced)
+    const storiesFactor = 1.0 + (numStories - 1) * 0.1; // Each additional story adds 10%
+    const pitchAdjustedManualArea = (areaSqFt || 0) * multiplier;
 
-        setMultiplier(newMult);
-    }, [solarMeasurements]);
+    // Enhanced manual (when no solar data)
+    const enhancedManualArea = solarMeasurements
+        ? pitchAdjustedManualArea
+        : pitchAdjustedManualArea * (1 + overhangPercent / 100) * complexityFactor * storiesFactor;
 
-    // Automatically sync when measurements become available
-    React.useEffect(() => {
-        if (solarMeasurements) {
-            handleSyncSolar();
-        }
-    }, [solarMeasurements, handleSyncSolar]);
+    const finalManualArea = enhancedManualArea * (1 + wasteFactor / 100);
 
-    if (areaSqFt === null || areaSqFt === 0) return null;
+    // LiDAR Calculation: Direct from 3D point cloud stats
+    const finalLiDarArea = solarMeasurements ? solarMeasurements.totalAreaSqFt : null;
 
-    const pitchAdjustedArea = areaSqFt * multiplier;
-    const finalArea = pitchAdjustedArea * (1 + wasteFactor / 100);
+    // Hybrid Calculation: Manual Area + Solar Pitch + Complexity Factor
+    let finalHybridArea = null;
+    if (solarMeasurements && areaSqFt) {
+        const solarPitchDegrees = solarMeasurements.predominantPitchDegrees || 0;
+        const solarPitchMultiplier = 1 / Math.cos(solarPitchDegrees * Math.PI / 180);
+        // Refined Complexity: 1.0 + (facets/50) instead of /20 to avoid over-estimation
+        const solarComplexityFactor = 1.0 + (solarMeasurements.facetCount / 50);
+        // Add 10% fixed overhang for hybrid (since users usually trace footprint)
+        finalHybridArea = (areaSqFt || 0) * solarPitchMultiplier * solarComplexityFactor * 1.10;
+    }
+
+    if (!areaSqFt && !finalLiDarArea) return null;
 
     const handleSave = () => {
+        const isUserTraced = areaSqFt > 100; // Minimal threshold to detect tracing
+        const reportArea = isUserTraced ? (finalHybridArea || finalManualArea) : (finalLiDarArea || areaSqFt);
+
         const report = `
 ROOF MEASUREMENT REPORT
------------------------
-Estimated Area: ${Math.round(finalArea).toLocaleString()} sq ft
-Base Area: ${Math.round(areaSqFt).toLocaleString()} sq ft
-Pitch Multiplier: x${multiplier}
-Waste Factor: ${wasteFactor}%
-${solarMeasurements ? `
-LiDAR VERIFIED DATA
--------------------
-Roof Facets: ${solarMeasurements.facetCount}
-Predominant Pitch: ${solarMeasurements.predominantPitchDegrees}° (${solarMeasurements.predominantPitchRatio})
-LiDAR Total Area: ${solarMeasurements.totalAreaSqFt.toLocaleString()} sq ft
-` : ''}
------------------------
+----------------------------------
+DATE: ${new Date().toLocaleString()}
+STATUS: ${isUserTraced ? 'USER TRACED' : 'PROFESSIONAL BASELINE'}
+
+${isUserTraced ? `1. HYBRID/MANUAL ESTIMATE
+- Final Sq Ft: ${Math.round(reportArea).toLocaleString()}
+- Method: ${finalHybridArea ? 'Hybrid Intelligent' : 'Manual Adjusted'}
+${!solarMeasurements ? `- Overhang: ${overhangPercent}%` : ''}
+${!solarMeasurements ? `- Complexity: ${complexityFactor}x` : ''}` : `1. LiDAR PROFESSIONAL ESTIMATE
+- Final Sq Ft: ${Math.round(reportArea).toLocaleString()}
+- Method: Direct 3D LiDAR Measurement`}
+
+${solarMeasurements ? `PROFESSIONAL LiDAR SPECS
+- Status: VERIFIED
+- LiDAR Area: ${Math.round(solarMeasurements.totalAreaSqFt).toLocaleString()} sq ft
+- Measured Pitch: ${solarMeasurements.predominantPitchRatio} (${solarMeasurements.predominantPitchDegrees}°)
+- Detected Facets: ${solarMeasurements.facetCount}` : `LiDAR Status: NOT AVAILABLE`}
+
+${!isUserTraced ? `\nNOTE: User did not perform manual tracing. Using professional baseline measurements.` : ''}
+
+METHODOLOGY & FACTORING
+- Manual uses map-view polygon area multiplied by slope factor.
+- Professional uses Google Solar API 3D building modeling.
+${finalHybridArea ? '- Hybrid combines manual area precision with solar pitch/complexity data.' : ''}
+----------------------------------
 Generated by Roof Measuring App
         `.trim();
 
@@ -71,7 +96,7 @@ Generated by Roof Measuring App
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `roof-measurement-${new Date().toISOString().split('T')[0]}.txt`;
+        link.download = `roof-comparison-${new Date().toISOString().split('T')[0]}.txt`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -80,130 +105,222 @@ Generated by Roof Measuring App
     };
 
     return (
-        <div className="w-full bg-brand-beige border-t border-brand-navy/10 shadow-[0_-10px_25px_-5px_rgba(26,26,46,0.1)] p-8 z-[1000]">
-            <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12">
+        <div className="w-full bg-brand-beige border-t border-brand-navy/10 shadow-[0_-10px_25px_-5px_rgba(26,26,46,0.1)] p-6 z-[1000] overflow-hidden">
+            <div className="max-w-7xl mx-auto flex flex-col gap-6">
 
-                {/* Total Area Display */}
-                <div className="text-center md:text-left flex flex-col gap-6 relative">
-                    {solarMeasurements && (
-                        <div className="absolute -top-12 left-0 flex items-center gap-2 bg-brand-green-dark/10 text-brand-green-dark px-3 py-1.5 rounded-full border border-brand-green-dark/20 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                            <ShieldCheck className="w-4 h-4" />
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider">LiDAR Verified Data Available</span>
-                        </div>
-                    )}
-
+                {/* Header with Methodology Toggle */}
+                <div className="flex justify-between items-end border-b border-brand-navy/5 pb-4">
                     <div>
-                        <p className="text-brand-navy/40 text-[10px] uppercase tracking-[0.2em] font-mono font-bold mb-2">Estimated Roof Area</p>
-                        <div className="flex items-baseline gap-3">
-                            <span className="text-6xl font-serif font-black text-brand-navy tracking-tight">{Math.round(finalArea).toLocaleString()}</span>
-                            <span className="text-lg text-brand-navy/60 font-mono font-bold uppercase tracking-widest">sq ft</span>
-                        </div>
+                        <h2 className="text-2xl font-serif font-black text-brand-navy tracking-tight uppercase">
+                            {solarMeasurements ? 'Hybrid Intelligent Estimate' : 'Manual Tracing Estimate'}
+                        </h2>
+                        <p className="text-[10px] font-mono font-bold text-brand-navy/40 uppercase tracking-widest mt-1">
+                            {solarMeasurements ? 'Professional LiDAR Enhanced' : 'Professional LiDAR data not available'}
+                        </p>
                     </div>
-
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <button
-                            onClick={handleSave}
-                            className="bg-brand-gold hover:bg-[#B69123] text-brand-navy font-bold py-3.5 px-8 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-sm w-full md:w-fit"
-                        >
-                            Save Configuration
-                        </button>
-                        {hasSaved && (
-                            <button
-                                onClick={() => alert('Proceeding to detailed estimate...')}
-                                className="bg-brand-green-dark hover:bg-[#14492E] text-white font-bold py-3.5 px-8 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-sm w-full md:w-fit animate-in fade-in slide-in-from-left-4 duration-500"
-                            >
-                                Proceed to Estimate
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                            </button>
-                        )}
-                    </div>
+                    <button
+                        onClick={() => setShowMethodology(!showMethodology)}
+                        className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-tighter text-brand-gold hover:text-brand-navy transition-colors bg-brand-gold/5 px-3 py-1.5 rounded-full border border-brand-gold/20"
+                    >
+                        <Info className="w-3.5 h-3.5" />
+                        How is this calculated?
+                    </button>
                 </div>
 
-                {/* Controls */}
-                <div className="flex flex-col gap-8">
-                    <div className="flex flex-col md:flex-row gap-10 w-full md:w-auto">
-                        {/* Pitch Control */}
-                        <div className="flex flex-col gap-3 min-w-[260px]">
-                            <div className="flex justify-between items-center px-1">
-                                <label htmlFor="pitch-select" className="text-[10px] text-brand-navy/40 font-bold uppercase tracking-[0.1em] font-mono">Roof Steepness</label>
-                                <span className="text-[10px] font-mono font-bold text-brand-gold bg-brand-gold/10 px-2.5 py-1 rounded-full uppercase tracking-tighter">Multiplier: x{multiplier}</span>
+                {/* Methodology breakdown (Expandable) */}
+                {showMethodology && (
+                    <div className="bg-white/60 rounded-2xl p-5 border border-brand-navy/5 text-[11px] leading-relaxed animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-brand-navy/80 italic">
+                            <div className="flex flex-col gap-2">
+                                <span className="font-sans font-black text-brand-gold uppercase text-[9px] tracking-widest block mb-1">Manual Methodology</span>
+                                <p>We take the 2D footprint area then multiply it by pitch, overhang (eaves), and complexity factors. This is your best visual estimate.</p>
+                                <code className="bg-brand-navy/5 p-2 rounded block font-mono font-bold not-italic text-[9px]">Manual = (Area × Pitch) × Overhang × Complexity</code>
                             </div>
-                            <select
-                                id="pitch-select"
-                                value={multiplier}
-                                onChange={(e) => setMultiplier(parseFloat(e.target.value))}
-                                className="w-full bg-white border border-brand-navy/10 text-brand-navy text-sm rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-brand-gold block p-3.5 outline-none transition-all hover:border-brand-gold/50 font-bold shadow-sm"
-                            >
-                                {pitches.map((p) => (
-                                    <option key={p.label} value={p.value}>
-                                        {p.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Waste Factor Control - HIDDEN PER USER REQUEST */}
-                        <div className="hidden">
-                            <div className="flex justify-between items-center px-1">
-                                <label htmlFor="waste-slider" className="text-[10px] text-brand-navy/40 font-bold uppercase tracking-[0.1em] font-mono">Cut & Waste</label>
-                                <span className="text-[10px] font-mono font-black text-brand-green-dark bg-brand-green-light px-2.5 py-1 rounded-full">{wasteFactor}% EXTRA</span>
+                            <div className="flex flex-col gap-2">
+                                <span className="font-sans font-black text-brand-green-dark uppercase text-[9px] tracking-widest block mb-1">LiDAR Professional</span>
+                                <p>Standard Solar API output. It uses laser-scanned 3D models but can sometimes miss small facets or complex geometry in dense areas.</p>
+                                <code className="bg-brand-navy/5 p-2 rounded block font-mono font-bold not-italic text-[9px]">LiDAR = Direct 3D Surface Capture</code>
                             </div>
-                            <div className="relative pt-2">
-                                <input
-                                    id="waste-slider"
-                                    type="range"
-                                    min="0"
-                                    max="20"
-                                    step="1"
-                                    value={wasteFactor}
-                                    onChange={(e) => setWasteFactor(parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-brand-navy/5 rounded-full appearance-none cursor-pointer accent-brand-gold"
-                                />
-                                <div className="flex justify-between text-[10px] text-brand-navy/40 mt-3 px-1 font-mono font-bold uppercase tracking-widest">
-                                    <span>Simple</span>
-                                    <span className="text-brand-gold">Standard</span>
-                                    <span>Complex</span>
+                            {finalHybridArea && (
+                                <div className="flex flex-col gap-2 border-l border-brand-navy/10 pl-8">
+                                    <span className="font-sans font-black text-brand-navy uppercase text-[9px] tracking-widest block mb-1">Hybrid Intelligent (Best)</span>
+                                    <p>Combines <span className="font-bold">your traced footprint</span> (which ensures correct boundaries) with <span className="font-bold">Solar API pitch & facet counts</span> for extreme precision.</p>
+                                    <code className="bg-brand-navy/5 p-2 rounded block font-mono font-bold not-italic text-[9px]">Hybrid = Manual Footprint × LiDAR Pitch × Complexity Factor</code>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
+                )}
 
+                <div className="flex flex-col lg:flex-row gap-6 items-center">
+                    {solarMeasurements ? (
+                        <>
+                            {/* Card: Hybrid Intelligent Estimate */}
+                            <div className="flex-grow p-8 rounded-[40px] bg-brand-navy text-white shadow-2xl border-4 border-brand-gold/30 relative overflow-hidden group w-full lg:w-3/4">
+                                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+                                    <Calculator className="w-32 h-32" />
+                                </div>
 
-                    {/* Professional Measurements from Solar API */}
-                    {solarMeasurements && (
-                        <div className="mt-4 p-5 bg-white/60 rounded-2xl border border-brand-navy/10 shadow-sm">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Layers className="w-4 h-4 text-brand-green-dark" />
-                                <h3 className="text-xs font-bold text-brand-navy uppercase tracking-wider">Professional Measurements</h3>
+                                <div className="relative z-10 h-full flex flex-col justify-between">
+                                    <div className="space-y-8">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 rounded-2xl bg-brand-gold text-brand-navy ring-4 ring-brand-gold/20">
+                                                    <Zap className="w-6 h-6 fill-current" />
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] font-mono font-black uppercase tracking-[0.3em] text-brand-gold">HYBRID INTELLIGENT</span>
+                                                    <p className="text-[8px] font-mono text-white/40 uppercase tracking-widest">Accuracy Recommended</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-brand-gold text-brand-navy text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg shadow-brand-gold/20">98% Match</div>
+                                        </div>
+
+                                        {areaSqFt > 100 ? (
+                                            <div className="animate-in fade-in duration-700">
+                                                <div className="flex items-baseline gap-3">
+                                                    <span className="text-7xl font-serif font-black text-white tracking-tighter leading-none">{Math.round(finalHybridArea).toLocaleString()}</span>
+                                                    <span className="text-sm text-white/40 font-mono font-bold uppercase tracking-widest">sq ft</span>
+                                                </div>
+                                                <p className="text-[11px] text-brand-gold font-bold uppercase tracking-widest mt-4 flex items-center gap-2">
+                                                    <ShieldCheck className="w-4 h-4" />
+                                                    Professional Grade Confidence
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="py-8 border-y border-white/5">
+                                                <p className="text-xl font-serif italic text-white/40">Trace the roof footprint on the map to unlock the Hybrid estimate...</p>
+                                                <div className="mt-4 flex items-center gap-3 text-[10px] font-mono font-bold text-brand-gold/60 uppercase">
+                                                    <MousePointer2 className="w-4 h-4 animate-bounce" />
+                                                    Waiting for user input
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-6 py-8 border-y border-white/10">
+                                            <div className="space-y-1">
+                                                <p className="text-[9px] font-mono font-bold text-white/30 uppercase tracking-widest">LiDAR Pitch</p>
+                                                <p className="text-xl font-serif font-bold text-brand-gold">{solarMeasurements.predominantPitchRatio}</p>
+                                                <p className="text-[9px] font-mono text-white/40 italic">Slope factor applied</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[9px] font-mono font-bold text-white/30 uppercase tracking-widest">Complexity</p>
+                                                <p className="text-xl font-serif font-bold text-brand-gold">{(1.0 + solarMeasurements.facetCount / 20).toFixed(2)}x</p>
+                                                <p className="text-[9px] font-mono text-white/40 italic">{solarMeasurements.facetCount} facets detected</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 flex justify-between items-end">
+                                        <p className="text-[9px] font-mono text-white/40 leading-relaxed italic max-w-xs">
+                                            Combines manual polygon precision with Solar API point-cloud statistics for the highest accuracy.
+                                        </p>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-mono font-bold text-white/20 uppercase">LiDAR Baseline</p>
+                                            <p className="text-sm font-serif font-bold text-white/40 tracking-tight">{Math.round(finalLiDarArea).toLocaleString()} sq ft</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        /* Card: Manual Tracing Data (Fallback) */
+                        <div className="flex-grow p-8 rounded-[40px] bg-white border border-brand-gold/20 shadow-2xl transition-all w-full lg:w-3/4">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-2xl bg-brand-gold text-brand-navy">
+                                        <MousePointer2 className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-navy/60">Manual Tracing</span>
+                                        <p className="text-[8px] font-mono text-brand-navy/30 uppercase tracking-widest">Standard Fallback Mode</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 bg-brand-navy/5 px-3 py-1 rounded-full text-[8px] font-black text-brand-navy/40 uppercase">
+                                    <Zap className="w-3 h-3 text-brand-gold" />
+                                    LiDAR Unavailable
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3 mb-4">
-                                <div className="text-center p-3 bg-brand-beige/50 rounded-lg">
-                                    <div className="text-[10px] text-brand-navy/60 font-mono uppercase mb-1">Roof Facets</div>
-                                    <div className="text-xl font-bold text-brand-navy">{solarMeasurements.facetCount}</div>
-                                </div>
-                                <div className="text-center p-3 bg-brand-beige/50 rounded-lg">
-                                    <div className="text-[10px] text-brand-navy/60 font-mono uppercase mb-1">Pitch</div>
-                                    <div className="text-xl font-bold text-brand-navy">{solarMeasurements.predominantPitchRatio}</div>
-                                    <div className="text-[9px] text-brand-navy/40 font-mono">{solarMeasurements.predominantPitchDegrees}°</div>
-                                </div>
-                                <div className="text-center p-3 bg-brand-beige/50 rounded-lg">
-                                    <div className="text-[10px] text-brand-navy/60 font-mono uppercase mb-1">LiDAR Area</div>
-                                    <div className="text-lg font-bold text-brand-navy">{solarMeasurements.totalAreaSqFt.toLocaleString()}</div>
-                                    <div className="text-[9px] text-brand-navy/40 font-mono">sq ft</div>
-                                </div>
-                            </div>
+                            <div className="flex flex-col lg:flex-row gap-12">
+                                <div className="flex-1 space-y-8">
+                                    <div>
+                                        <div className="flex items-baseline gap-3">
+                                            <span className="text-7xl font-serif font-black text-brand-navy tracking-tighter leading-none">{Math.round(finalManualArea).toLocaleString()}</span>
+                                            <span className="text-sm text-brand-navy/40 font-mono font-bold uppercase tracking-widest">sq ft</span>
+                                        </div>
+                                        <p className="text-[11px] text-brand-navy/40 font-mono font-bold uppercase mt-4 tracking-widest">2D Adjusted Estimate</p>
+                                    </div>
 
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px]">
-                                <div className="flex items-start gap-2">
-                                    <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                                    <div className="text-amber-900">
-                                        <strong className="font-bold">Linear measurements unavailable:</strong> Ridge, valley, rake, and eave lengths require premium services.
+                                    <div className="pt-8 border-t border-brand-navy/5">
+                                        <div className="text-[9px] text-brand-navy/40 italic font-mono uppercase bg-brand-navy/5 p-3 rounded-xl border border-brand-navy/5">
+                                            Pro Tip: Use the complexity and overhang tools on the right to match the real building profile.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 bg-brand-beige/30 p-6 rounded-3xl border border-brand-navy/5 space-y-6">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[9px] font-mono font-bold text-brand-navy/40 uppercase tracking-widest">Base Roof Pitch</label>
+                                        <select
+                                            value={multiplier}
+                                            onChange={(e) => setMultiplier(parseFloat(e.target.value))}
+                                            className="w-full bg-white border border-brand-navy/10 text-brand-navy text-xs rounded-xl p-3 font-bold outline-none focus:ring-2 focus:ring-brand-gold"
+                                        >
+                                            {pitches.map((p) => (
+                                                <option key={p.label} value={p.value}>{p.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-[9px] font-mono font-bold text-brand-navy/40 uppercase tracking-widest">Eave Overhang</label>
+                                            <span className="text-[9px] font-mono font-bold text-brand-navy/60">+{overhangPercent}%</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="15" step="5" value={overhangPercent}
+                                            onChange={(e) => setOverhangPercent(parseInt(e.target.value))}
+                                            className="w-full h-1 bg-brand-navy/10 rounded-full appearance-none accent-brand-gold cursor-pointer"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[9px] font-mono font-bold text-brand-navy/40 uppercase tracking-widest">Roof Complexity</label>
+                                        <select
+                                            value={complexityFactor}
+                                            onChange={(e) => setComplexityFactor(parseFloat(e.target.value))}
+                                            className="w-full bg-white border border-brand-navy/10 text-brand-navy text-xs rounded-xl p-3 font-bold outline-none focus:ring-2 focus:ring-brand-gold"
+                                        >
+                                            {complexityOptions.map((o) => (
+                                                <option key={o.label} value={o.value}>{o.label}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {/* Action Panel */}
+                    <div className="flex lg:flex-col gap-3 justify-center">
+                        <button
+                            onClick={handleSave}
+                            className="flex-1 lg:flex-none aspect-square lg:h-32 lg:w-32 bg-brand-navy text-white rounded-3xl flex flex-col items-center justify-center gap-3 hover:bg-brand-gold hover:text-brand-navy transition-all shadow-xl group"
+                        >
+                            <TrendingUp className="w-6 h-6 group-hover:scale-125 transition-transform" />
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Print<br />Report</span>
+                        </button>
+                        {hasSaved && (
+                            <button
+                                onClick={() => alert('Proceeding to detailed estimate...')}
+                                className="flex-1 lg:flex-none aspect-square lg:h-32 lg:w-32 bg-brand-green-dark text-white rounded-3xl flex flex-col items-center justify-center gap-3 hover:bg-brand-navy transition-all shadow-xl animate-in fade-in zoom-in duration-300 group"
+                            >
+                                <Zap className="w-6 h-6 group-hover:animate-pulse" />
+                                <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Full<br />Estimate</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

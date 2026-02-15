@@ -22,15 +22,6 @@ function App() {
         // Fetch professional LiDAR data
         const data = await fetchBuildingInsights(location.lat, location.lon);
         setSolarData(data);
-
-        // If we have solar data, skip manual input requirement
-        if (data && data.solarPotential) {
-            const SQM_TO_SQFT = 10.7639;
-            const totalRoofArea = data.solarPotential.wholeRoofStats?.areaMeters2 * SQM_TO_SQFT || 0;
-            if (totalRoofArea > 0) {
-                setAreaSqFt(Math.round(totalRoofArea));
-            }
-        }
     }, []);
 
     const handlePolygonUpdate = React.useCallback((layer) => {
@@ -43,6 +34,13 @@ function App() {
             setAreaSqFt(0);
         }
     }, []);
+
+    const handleDevManualInit = () => {
+        setSolarData(null);
+        setAreaSqFt(0);
+        // This will force the banner to show and the MapContainer to re-create the box
+        // because center doesn't change, but solarData becomes null.
+    };
 
     return (
         <div className="h-screen w-screen relative overflow-hidden bg-brand-beige font-sans">
@@ -103,6 +101,7 @@ function App() {
                             <RoofMap
                                 center={mapCenter}
                                 zoom={mapZoom}
+                                solarData={solarData}
                                 onPolygonUpdate={handlePolygonUpdate}
                             />
                         </div>
@@ -111,6 +110,17 @@ function App() {
                             onLocationSelect={handleLocationSelect}
                             className="absolute top-6 left-6 right-6 md:right-auto md:w-96 z-[5000]"
                         />
+
+                        {/* Developer Tools */}
+                        <div className="absolute top-6 right-6 z-[5000] flex gap-2">
+                            <button
+                                onClick={handleDevManualInit}
+                                className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-[10px] text-white/40 font-mono font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 hover:text-white"
+                            >
+                                <span className="w-2 h-2 rounded-full bg-brand-gold"></span>
+                                [DEV] MANUAL INIT
+                            </button>
+                        </div>
 
                         {/* Instructional Banner (Only if solar data is NOT present) */}
                         {!solarData && (
