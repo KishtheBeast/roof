@@ -274,32 +274,41 @@ function App() {
                     )}
 
                     {hasLocation && solarData && (
-                        <div className="absolute top-6 right-6 z-[2000] flex items-center gap-2">
+                        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[2000] flex items-center gap-2">
                             <button
                                 onClick={triggerAiAnalysis}
                                 disabled={isAnalyzing}
-                                className={`px-10 py-4 rounded-3xl font-black text-[12px] tracking-[0.2em] uppercase shadow-[0_20px_40px_rgba(0,0,0,0.3)] transition-all duration-300 flex items-center gap-4 group border border-white/30 backdrop-blur-xl ${isAnalyzing
+                                className={`px-12 py-6 rounded-[2.5rem] font-black text-[12px] tracking-[0.2em] uppercase shadow-[0_30px_60px_rgba(0,0,0,0.5)] transition-all duration-300 flex items-center gap-4 group border border-white/20 backdrop-blur-2xl ${isAnalyzing
                                     ? 'bg-brand-navy/80 text-white/50 cursor-not-allowed'
                                     : 'bg-brand-gold text-brand-navy hover:scale-105 active:scale-95'
                                     }`}
                             >
-                                <Shield className={`w-5 h-5 ${isAnalyzing ? 'animate-pulse' : 'group-hover:rotate-12 transition-transform'}`} />
-                                {isAnalyzing ? 'Processing...' : 'Analyze Building'}
+                                <Shield className={`w-6 h-6 ${isAnalyzing ? 'animate-pulse' : 'group-hover:rotate-12 transition-transform'}`} />
+                                {isAnalyzing ? 'Analyzing Roof Geometry...' : 'Analyze Building'}
                             </button>
                         </div>
                     )}
 
-                    {/* Floating Overlay: Measurement Details Panel */}
-                    <div className="absolute bottom-10 left-10 right-10 z-[3000] flex justify-center pointer-events-none">
-                        <div className="w-full max-w-5xl h-[320px] pointer-events-auto rounded-[40px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] border border-white/10 backdrop-blur-2xl bg-brand-navy/85">
-                            <MeasurementDisplay
-                                areaSqFt={areaSqFt}
-                                solarData={solarData}
-                                aiMeasurements={aiMeasurements}
-                                isAnalyzing={isAnalyzing}
-                            />
+                    {/* Floating Overlay: Measurement Details Panel - ONLY shown during/after analysis */}
+                    {(isAnalyzing || aiMeasurements) && (
+                        <div className="absolute bottom-10 left-10 right-10 z-[3000] flex justify-center pointer-events-none animate-in slide-in-from-bottom duration-700">
+                            <div className="w-full max-w-6xl h-[320px] pointer-events-auto rounded-[40px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] border border-white/10 backdrop-blur-2xl bg-brand-navy/85 transition-all duration-500">
+                                <MeasurementDisplay
+                                    areaSqFt={areaSqFt}
+                                    solarData={solarData}
+                                    aiMeasurements={aiMeasurements}
+                                    isAnalyzing={isAnalyzing}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Global Overrides for Leaflet Draw to hide toolbar */}
+                    <style>{`
+                        .leaflet-draw-toolbar {
+                            display: none !important;
+                        }
+                    `}</style>
 
                     {/* Subtle Corner Vignette */}
                     <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-brand-navy/30 via-transparent to-brand-navy/50 z-[1]"></div>

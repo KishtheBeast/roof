@@ -160,7 +160,7 @@ function DrawControl({ center, suggestedFootprint, onCreated, onDeleted, onEdite
 // Viewfinder component removed in favor of native Leaflet Draw controls
 
 // Component to update map view when props change
-function ChangeView({ center, zoom, bounds }) {
+function ChangeView({ center, zoom, bounds, isAnalysisMode }) {
     const map = useMap();
     useEffect(() => {
         // Ensure map knows its actual size (fixes gray bars/misalignment)
@@ -168,7 +168,7 @@ function ChangeView({ center, zoom, bounds }) {
 
         if (bounds) {
             map.fitBounds(bounds, {
-                padding: [5, 5], // Tighter fit for Studio mode
+                padding: [0, 0], // NO padding for full-screen building zoom
                 maxZoom: 22,
                 animate: true,
                 duration: 1.5
@@ -179,7 +179,7 @@ function ChangeView({ center, zoom, bounds }) {
                 duration: 1.5
             });
         }
-    }, [center, zoom, bounds, map]);
+    }, [center, zoom, bounds, map, isAnalysisMode]);
     return null;
 }
 
@@ -197,7 +197,7 @@ export default function RoofMap({ center, zoom, solarData, suggestedFootprint, o
     }, [onPolygonUpdate]);
 
     return (
-        <div className={`h-full w-full flex items-center justify-center transition-all duration-700 ${isAnalysisMode ? 'bg-brand-navy' : ''}`}>
+        <div className={`h-full w-full flex justify-center transition-all duration-700 ${isAnalysisMode ? 'bg-brand-navy items-start pt-16' : 'items-center'}`}>
             <div
                 className={`relative overflow-hidden transition-all duration-700 ${isAnalysisMode ? 'rounded-[2rem] border-[12px] border-brand-gold/20 shadow-[0_0_100px_rgba(251,191,36,0.15)] ring-1 ring-brand-gold/30' : 'h-full w-full'}`}
                 style={isAnalysisMode ? { width: '996px', height: '1001px' } : {}}
@@ -215,7 +215,12 @@ export default function RoofMap({ center, zoom, solarData, suggestedFootprint, o
                     touchZoom={!isAnalysisMode}
                     style={{ height: '100%', width: '100%', backgroundColor: '#0f172a' }} // brand-navy background
                 >
-                    <ChangeView center={center} zoom={zoom} bounds={rgbOverlay?.bounds} />
+                    <ChangeView
+                        center={center}
+                        zoom={zoom}
+                        bounds={rgbOverlay?.bounds}
+                        isAnalysisMode={isAnalysisMode}
+                    />
 
                     {/* Standard Map Tiles - ONLY loaded if no high-res solar data exists */}
                     {!rgbOverlay && (
