@@ -86,15 +86,29 @@ RETURN ONLY A JSON OBJECT with these exact keys:
             }
         ];
 
-        const response = await axios.post('/api/anthropic', {
+        const isDev = import.meta.env.DEV;
+        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+        // Use proxy in dev, direct URL in prod (GitHub Pages)
+        const url = isDev ? '/api/anthropic' : 'https://api.anthropic.com/v1/messages';
+
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        // If in production/static environment, we must provide headers directly
+        // WARNING: This exposes the API key in the browser.
+        if (!isDev) {
+            headers['x-api-key'] = apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+            headers['anthropic-dangerous-direct-browser-access'] = 'true';
+        }
+
+        const response = await axios.post(url, {
             model: CLAUDE_MODEL,
             max_tokens: 1000,
             messages
-        }, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+        }, { headers });
 
         const content = response.data.content[0].text;
 
