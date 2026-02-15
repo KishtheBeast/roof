@@ -197,19 +197,22 @@ export default function RoofMap({ center, zoom, solarData, suggestedFootprint, o
     }, [onPolygonUpdate]);
 
     return (
-        <div className={`h-full w-full transition-all duration-700 ${isAnalysisMode ? 'p-4 bg-brand-navy' : ''}`}>
-            <div className={`h-full w-full relative overflow-hidden transition-all duration-700 ${isAnalysisMode ? 'rounded-[2rem] border-[12px] border-brand-gold/20 shadow-[0_0_100px_rgba(251,191,36,0.15)] ring-1 ring-brand-gold/30' : ''}`}>
+        <div className={`h-full w-full flex items-center justify-center transition-all duration-700 ${isAnalysisMode ? 'bg-brand-navy' : ''}`}>
+            <div
+                className={`relative overflow-hidden transition-all duration-700 ${isAnalysisMode ? 'rounded-[2rem] border-[12px] border-brand-gold/20 shadow-[0_0_100px_rgba(251,191,36,0.15)] ring-1 ring-brand-gold/30' : 'h-full w-full'}`}
+                style={isAnalysisMode ? { width: '996px', height: '1001px' } : {}}
+            >
                 <MapContainer
                     center={center}
                     zoom={zoom}
                     zoomControl={false}
                     attributionControl={false}
-                    dragging={true}
-                    scrollWheelZoom={true}
-                    doubleClickZoom={true}
-                    boxZoom={true}
-                    keyboard={true}
-                    touchZoom={true}
+                    dragging={!isAnalysisMode}
+                    scrollWheelZoom={!isAnalysisMode}
+                    doubleClickZoom={!isAnalysisMode}
+                    boxZoom={!isAnalysisMode}
+                    keyboard={!isAnalysisMode}
+                    touchZoom={!isAnalysisMode}
                     style={{ height: '100%', width: '100%', backgroundColor: '#0f172a' }} // brand-navy background
                 >
                     <ChangeView center={center} zoom={zoom} bounds={rgbOverlay?.bounds} />
