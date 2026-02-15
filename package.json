@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
     "@turf/turf": "^6.5.0",
     "axios": "^1.6.2",
+    "html2canvas": "^1.4.1",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
     "lucide-react": "^0.294.0",

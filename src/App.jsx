@@ -5,7 +5,38 @@ import MeasurementDisplay from './components/MeasurementDisplay';
 import { calculatePolygonArea } from './utils/calculateArea';
 import { fetchBuildingInsights, processSolarData } from './utils/solarApi';
 import { analyzeRoofWithClaude } from './utils/anthropicApi';
-import { Ruler, Maximize, Shield, ArrowRight, Loader2 } from 'lucide-react';
+import { Ruler, Maximize, Shield } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+// Initialize Google Maps API
+if (API_KEY) {
+    setOptions({
+        apiKey: API_KEY, // Try both standard and potential variations
+        key: API_KEY,
+        version: "weekly"
+    });
+    console.log('[Google Maps] Key configured (length:', API_KEY.length, ')');
+} else {
+    console.error('[Google Maps] CRITICAL: VITE_GOOGLE_MAPS_API_KEY is missing!');
+}
+
+async function initializeGoogleMaps() {
+    if (!API_KEY) return;
+
+    try {
+        // Load libraries sequentially to ensure correct initialization
+        await importLibrary("places");
+        await importLibrary("maps");
+        console.log('[Google Maps] Libraries loaded successfully');
+    } catch (e) {
+        console.error('[Google Maps] Library Load Failure:', e);
+    }
+}
+
+// Start loading the API immediately in the background
+initializeGoogleMaps().catch(e => console.error('[Google Maps] Init Promise Error:', e));
 
 function App() {
     const [mapCenter, setMapCenter] = useState([39.6368, -74.8035]); // Default: South Jersey (Hammonton area)
@@ -15,11 +46,13 @@ function App() {
     const [solarData, setSolarData] = useState(null);
     const [aiMeasurements, setAiMeasurements] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [suggestedFootprint, setSuggestedFootprint] = useState(null);
 
     const handleLocationSelect = React.useCallback(async (location) => {
         setMapCenter([location.lat, location.lon]);
         setMapZoom(21); // Zoom in very close for roof detail
         setAreaSqFt(0); // Reset area
+        setSuggestedFootprint(null);
         setHasLocation(true);
 
         // Fetch professional LiDAR data
@@ -30,9 +63,64 @@ function App() {
         if (data) {
             setIsAnalyzing(true);
             try {
+                // Wait for map tiles to stabilize before capturing
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                let imageBase64 = null;
+                let mapBounds = null;
+                const mapElement = document.querySelector('.leaflet-container');
+
+                if (mapElement) {
+                    try {
+                        // Capture map bounds at the time of screenshot
+                        // This allows us to map normalized (0-1) coordinates back to Lat/Lng
+                        const mapInstance = window.L?.DomUtil.get(mapElement)?._leaflet_map;
+                        if (mapInstance) {
+                            const bounds = mapInstance.getBounds();
+                            mapBounds = {
+                                north: bounds.getNorth(),
+                                south: bounds.getSouth(),
+                                east: bounds.getEast(),
+                                west: bounds.getWest()
+                            };
+                        }
+
+                        const canvas = await html2canvas(mapElement, {
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: null,
+                            logging: false
+                        });
+                        imageBase64 = canvas.toDataURL('image/png');
+                        console.log('[Capture] Map screenshot generated successfully');
+                    } catch (captureErr) {
+                        console.error('[Capture] Failed to generate map screenshot:', captureErr);
+                    }
+                }
+
                 const processed = processSolarData(data);
-                const aiResult = await analyzeRoofWithClaude(processed, data);
+                const aiResult = await analyzeRoofWithClaude(processed, data, imageBase64);
                 setAiMeasurements(aiResult);
+
+                // [AI MOVE BOX] Map normalized footprint (0-1) to Lat/Lng
+                if (aiResult?.normalizedFootprint && mapBounds) {
+                    const latRange = mapBounds.north - mapBounds.south;
+                    const lngRange = mapBounds.east - mapBounds.west;
+
+                    const latsLngs = aiResult.normalizedFootprint.map(p => [
+                        mapBounds.north - (p.y * latRange), // y=0 is north
+                        mapBounds.west + (p.x * lngRange)   // x=0 is west
+                    ]);
+                    setSuggestedFootprint(latsLngs);
+                    console.log('[AI] Footprint refined and mapped to Lat/Lng');
+                }
+
+                // [AUTO-SET] Automatically populate the ground area if AI verified it
+                if (aiResult?.estimatedGroundAreaSqFt) {
+                    setAreaSqFt(aiResult.estimatedGroundAreaSqFt);
+                } else if (processed.wholeRoofStats?.groundAreaSqFt) {
+                    setAreaSqFt(processed.wholeRoofStats.groundAreaSqFt);
+                }
             } catch (err) {
                 console.error('AI Analysis failed:', err);
             } finally {
@@ -46,8 +134,6 @@ function App() {
             const area = calculatePolygonArea(layer);
             setAreaSqFt(area);
         } else {
-            // If we don't have solar data, reset area on layer removal
-            // But if we have solar data, we might want to keep it or let user override
             setAreaSqFt(0);
         }
     }, []);
@@ -55,8 +141,7 @@ function App() {
     const handleDevManualInit = () => {
         setSolarData(null);
         setAreaSqFt(0);
-        // This will force the banner to show and the MapContainer to re-create the box
-        // because center doesn't change, but solarData becomes null.
+        setSuggestedFootprint(null);
     };
 
     return (
@@ -119,6 +204,7 @@ function App() {
                                 center={mapCenter}
                                 zoom={mapZoom}
                                 solarData={solarData}
+                                suggestedFootprint={suggestedFootprint}
                                 onPolygonUpdate={handlePolygonUpdate}
                             />
                         </div>

@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
 import { Search, MapPin } from 'lucide-react';
 
 export default function AddressSearch({ onLocationSelect, className = "absolute top-4 left-4 z-[1000] w-full max-w-md font-sans" }) {
@@ -22,37 +21,53 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
     }, [query]);
 
     const searchAddress = async () => {
+        if (!window.google || !window.google.maps.places) return;
         setLoading(true);
         try {
-            // Restrict to NY, NJ, CT using viewbox and bounded params
-            // Viewbox: [left, top, right, bottom] -> [lon, lat, lon, lat]
-            // Approx for NY/NJ/CT: -80, 45, -71, 39
-            const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-                params: {
-                    q: query,
-                    format: 'json',
-                    addressdetails: 1,
-                    limit: 5,
-                    viewbox: '-79.76,45.01,-71.78,38.93',
-                    bounded: 1
-                }
-            });
-            setResults(response.data);
-            setShowDropdown(true);
+            const { AutocompleteSuggestion } = await window.google.maps.importLibrary("places");
+
+            const request = {
+                input: query,
+                includedRegionCodes: ['us'],
+            };
+
+            const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+
+            if (suggestions && suggestions.length > 0) {
+                setResults(suggestions);
+                setShowDropdown(true);
+            } else {
+                setResults([]);
+                setShowDropdown(false);
+            }
+            setLoading(false);
         } catch (error) {
             console.error('Search error:', error);
-        } finally {
             setLoading(false);
         }
     };
 
-    const handleSelect = (item) => {
-        setQuery(item.display_name);
+    const handleSelect = async (item) => {
+        setQuery(item.placePrediction.text.text);
         setShowDropdown(false);
-        onLocationSelect({
-            lat: parseFloat(item.lat),
-            lon: parseFloat(item.lon)
-        });
+
+        try {
+            const { Place } = await window.google.maps.importLibrary("places");
+            const place = new Place({
+                id: item.placePrediction.placeId,
+            });
+
+            await place.fetchFields({ fields: ['location'] });
+
+            if (place.location) {
+                onLocationSelect({
+                    lat: place.location.lat(),
+                    lon: place.location.lng()
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching place details:', error);
+        }
     };
 
     return (
@@ -78,13 +93,13 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
                     <ul className="absolute top-full left-0 right-0 mt-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_20px_50px_rgba(26,26,46,0.2)] border border-brand-navy/5 max-h-80 overflow-y-auto divide-y divide-brand-navy/5 overflow-hidden font-mono text-[11px] font-bold">
                         {results.map((item) => (
                             <li
-                                key={item.place_id}
+                                key={item.placePrediction.placeId}
                                 onClick={() => handleSelect(item)}
                                 className="px-5 py-4 hover:bg-brand-gold/5 cursor-pointer flex items-start gap-4 transition-all hover:pl-7"
                             >
                                 <MapPin className="w-4 h-4 text-brand-gold mt-0.5 flex-shrink-0" strokeWidth={2.5} />
                                 <div className="text-brand-navy/80 leading-snug uppercase tracking-tight">
-                                    {item.display_name}
+                                    {item.placePrediction.text.text}
                                 </div>
                             </li>
                         ))}

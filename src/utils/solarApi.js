@@ -51,18 +51,25 @@ export function processSolarData(apiResponse) {
 
     // Convert whole roof area to sq ft
     const totalRoofArea = solarPotential.wholeRoofStats?.areaMeters2 * SQM_TO_SQFT || 0;
+    const wholeRoofStats = {
+        areaSqFt: Math.round(totalRoofArea),
+        groundAreaSqFt: Math.round(solarPotential.wholeRoofStats?.groundAreaMeters2 * SQM_TO_SQFT || 0)
+    };
 
     return {
         facetCount: segments.length,
         predominantPitchDegrees: Math.round(predominantPitch * 10) / 10,
         predominantPitchRatio: degreesToPitchRatio(predominantPitch),
         totalAreaSqFt: Math.round(totalRoofArea),
+        wholeRoofStats,
         maxSolarPanels: solarPotential.maxArrayPanelsCount || 0,
         imageryDate: apiResponse.imageryDate,
-        segments: segments.map(s => ({
+        segments: segments.map((s, i) => ({
+            id: i + 1,
             pitch: Math.round(s.pitchDegrees * 10) / 10,
             area: Math.round(s.stats.areaMeters2 * SQM_TO_SQFT),
-            azimuth: Math.round(s.azimuthDegrees)
+            azimuth: Math.round(s.azimuthDegrees),
+            center: s.center
         }))
     };
 }

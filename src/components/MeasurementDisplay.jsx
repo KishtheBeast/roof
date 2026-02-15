@@ -1,111 +1,74 @@
 import React from 'react';
-import { ShieldCheck, Info, Zap, Layers, TrendingUp, Calculator, MousePointer2, Loader2, ArrowRight, Ruler, History } from 'lucide-react';
+import { ShieldCheck, Info, Zap, Layers, TrendingUp, Calculator, MousePointer2, Loader2, ArrowRight, Ruler, History, Maximize } from 'lucide-react';
 import { processSolarData } from '../utils/solarApi';
 
 export default function MeasurementDisplay({ areaSqFt, solarData, aiMeasurements, isAnalyzing }) {
     // Process Solar API data
     const solarMeasurements = solarData ? processSolarData(solarData) : null;
 
-    // Pitch multipliers (Intuitive for non-technical users)
+    // Pitch multipliers
     const pitches = [
-        { label: 'Flat Roof (Walking Surface)', value: 1.00 },
-        { label: 'Low Slope (Slight Incline)', value: 1.05 },
-        { label: 'Standard House (Typical)', value: 1.12 },
-        { label: 'Steep (Difficult to Walk)', value: 1.25 },
-        { label: 'Very Steep (Professional Only)', value: 1.40 },
-    ];
-
-    const complexityOptions = [
-        { label: 'Simple (Single plane, no valleys)', value: 1.0 },
-        { label: 'Moderate (Few valleys/hips)', value: 1.15 },
-        { label: 'Complex (Multiple levels/dormers)', value: 1.30 },
+        { label: 'Flat Roof', value: 1.00 },
+        { label: 'Low Slope', value: 1.05 },
+        { label: 'Standard House', value: 1.12 },
+        { label: 'Steep', value: 1.25 },
+        { label: 'Very Steep', value: 1.40 },
     ];
 
     const [multiplier, setMultiplier] = React.useState(1.12);
     const [wasteFactor, setWasteFactor] = React.useState(0);
     const [hasSaved, setHasSaved] = React.useState(false);
     const [showMethodology, setShowMethodology] = React.useState(false);
-
-    // Enhanced manual inputs (when no Solar API)
-    const [overhangPercent, setOverhangPercent] = React.useState(10);
-    const [complexityFactor, setComplexityFactor] = React.useState(1.15);
-    const [numStories, setNumStories] = React.useState(1);
     const [isCollapsed, setIsCollapsed] = React.useState(false);
 
-    // Manual Calculation: 2D Area * Pitch Multiplier (basic or enhanced)
-    const storiesFactor = 1.0 + (numStories - 1) * 0.1; // Each additional story adds 10%
-    const pitchAdjustedManualArea = (areaSqFt || 0) * multiplier;
+    // Derived area (Hybrid) 
+    // If we have solar data + manual/ai area, use specialized hybrid math
+    const solarPitchDegrees = solarMeasurements?.predominantPitchDegrees || 0;
+    const solarPitchMultiplier = solarPitchDegrees > 0 ? (1 / Math.cos(solarPitchDegrees * Math.PI / 180)) : multiplier;
 
-    // Enhanced manual (when no solar data)
-    const enhancedManualArea = solarMeasurements
-        ? pitchAdjustedManualArea
-        : pitchAdjustedManualArea * (1 + overhangPercent / 100) * complexityFactor * storiesFactor;
-
-    const finalManualArea = enhancedManualArea * (1 + wasteFactor / 100);
-
-    // LiDAR Calculation: Direct from 3D point cloud stats
-    const finalLiDarArea = solarMeasurements ? solarMeasurements.totalAreaSqFt : null;
-
-    // Hybrid Calculation: Manual Area + Solar Pitch + Complexity Factor
-    let finalHybridArea = null;
-    if (solarMeasurements && areaSqFt) {
-        const solarPitchDegrees = solarMeasurements.predominantPitchDegrees || 0;
-        const solarPitchMultiplier = 1 / Math.cos(solarPitchDegrees * Math.PI / 180);
-        const solarComplexityFactor = 1.0 + (solarMeasurements.facetCount / 50);
-        finalHybridArea = (areaSqFt || 0) * solarPitchMultiplier * solarComplexityFactor * 1.10;
-    }
-
-    if (!areaSqFt && !finalLiDarArea && !isAnalyzing) return null;
+    // finalHybridArea uses the areaSqFt (auto-set by AI or manual) 
+    const finalHybridArea = (areaSqFt || 0) * solarPitchMultiplier;
+    const finalDisplayArea = finalHybridArea * (1 + wasteFactor / 100);
 
     const handleSave = () => {
-        const isUserTraced = areaSqFt > 100;
-        const reportArea = isUserTraced ? (finalHybridArea || finalManualArea) : (finalLiDarArea || areaSqFt);
-
         const report = `
 ROOF MEASUREMENT REPORT
 ----------------------------------
 DATE: ${new Date().toLocaleString()}
-STATUS: ${aiMeasurements ? 'AI ANALYZED' : (isUserTraced ? 'USER TRACED' : 'PROFESSIONAL BASELINE')}
+STATUS: ${aiMeasurements ? 'AI ANALYZED' : 'MANUAL/LIDAR HYBRID'}
 
-HYBRID ESTIMATE
-- Surface Area: ${Math.round(reportArea).toLocaleString()} sq ft
-- Calculation: ${finalHybridArea ? 'Intelligent Hybrid (Manual + Solar)' : 'Adjusted Manual'}
-- Base Area: ${Math.round(areaSqFt).toLocaleString()} sq ft
-${!solarMeasurements ? `- Overhang: ${overhangPercent}%` : ''}
-${!solarMeasurements ? `- Complexity: ${complexityFactor}x` : ''}
-${!solarMeasurements && numStories > 1 ? `- Stories: ${numStories}` : ''}
+PRIMARY ESTIMATE
+- Total Surface Area: ${Math.round(finalDisplayArea).toLocaleString()} sq ft
+- Base Ground Area: ${Math.round(areaSqFt).toLocaleString()} sq ft
+- Applied Pitch: ${solarMeasurements?.predominantPitchRatio || 'Manual'}
+- Waste Factor: ${wasteFactor}%
 
 ${aiMeasurements ? `AI AUTOMATED INSIGHTS
 - Total Ridges/Hips: ${aiMeasurements.ridgesHipsFeet} ft
 - Total Valleys: ${aiMeasurements.valleysFeet} ft
 - Total Rakes: ${aiMeasurements.rakesFeet} ft
 - Total Eaves: ${aiMeasurements.eavesFeet} ft
-- Predominant Pitch: ${aiMeasurements.predominantPitch}
-- Detected Facets: ${aiMeasurements.facetCount}
-- AI Confidence: ${Math.round(aiMeasurements.confidenceScore * 100)}%
-- AI Reasoning: ${aiMeasurements.estimationNotes}` : ''}
+- Complexity: ${aiMeasurements.complexity}
+- Confidence: ${Math.round(aiMeasurements.confidenceScore * 100)}%
+- Notes: ${aiMeasurements.estimationNotes}` : ''}
 
-PROFESSIONAL DATA (Solar API)
-- Status: ${solarMeasurements ? 'VERIFIED' : 'NOT AVAILABLE'}
-${solarMeasurements ? `- Measured Area: ${Math.round(solarMeasurements.totalAreaSqFt).toLocaleString()} sq ft
-- Detected Pitch: ${solarMeasurements.predominantPitchRatio}
-- Data Source: Google Satellite LiDAR` : ''}
-
+DATA SOURCE: Google Solar API LiDAR + Anthropic Claude AI
 ----------------------------------
-Generated by Roof Measuring App with Claude AI
         `.trim();
 
         const blob = new Blob([report], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `roof-analysis-${new Date().toISOString().split('T')[0]}.txt`;
+        link.download = `roof-report-${new Date().toISOString().split('T')[0]}.txt`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         setHasSaved(true);
     };
+
+    if (!areaSqFt && !isAnalyzing && !aiMeasurements) return null;
 
     return (
         <div className={`fixed bottom-8 right-8 z-[1000] transition-all duration-500 ease-in-out ${isCollapsed ? 'w-16 h-16' : 'w-[850px]'}`}>
@@ -148,9 +111,17 @@ Generated by Roof Measuring App with Claude AI
                     <div className="p-8 flex gap-8">
                         {/* PANEL 1: HYBRID MEASUREMENTS */}
                         <div className="flex-1 space-y-6">
-                            <div className="flex items-center gap-2 mb-2">
-                                <History className="w-3.5 h-3.5 text-brand-gold" />
-                                <h3 className="text-[10px] font-mono font-bold text-brand-navy/60 uppercase tracking-widest">Hybrid Analysis</h3>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <History className="w-3.5 h-3.5 text-brand-gold" />
+                                    <h3 className="text-[10px] font-mono font-bold text-brand-navy/60 uppercase tracking-widest">Hybrid Analysis</h3>
+                                </div>
+                                {aiMeasurements && (
+                                    <span className="flex items-center gap-1.5 px-3 py-1 bg-brand-gold/10 text-brand-gold text-[9px] font-black rounded-full border border-brand-gold/20 animate-in fade-in zoom-in duration-500">
+                                        <ShieldCheck className="w-3 h-3" />
+                                        AI AUTO-SET
+                                    </span>
+                                )}
                             </div>
 
                             <div className="p-6 rounded-3xl bg-brand-navy/5 border border-brand-navy/5 text-center relative overflow-hidden group">
@@ -160,146 +131,123 @@ Generated by Roof Measuring App with Claude AI
                                 <div className="relative z-10">
                                     <div className="flex items-baseline justify-center gap-2">
                                         <span className="text-5xl font-serif font-black text-brand-navy tracking-tighter">
-                                            {Math.round(finalHybridArea || finalManualArea).toLocaleString()}
+                                            {Math.round(finalDisplayArea).toLocaleString()}
                                         </span>
                                         <span className="text-sm font-mono font-bold text-brand-navy/30 uppercase">sq ft</span>
                                     </div>
                                     <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase tracking-widest mt-2 px-4 py-1.5 bg-brand-navy/10 rounded-full inline-block">
-                                        Calculated Hybrid Area
+                                        Surface Estimate
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Hybrid Controls */}
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 rounded-2xl bg-white border border-brand-navy/10">
-                                        <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1">Base Footprint</p>
-                                        <p className="text-sm font-serif font-bold text-brand-navy">{Math.round(areaSqFt).toLocaleString()}<span className="text-[10px] text-brand-navy/40 ml-1">sq ft</span></p>
-                                    </div>
-                                    <div className="p-3 rounded-2xl bg-white border border-brand-navy/10">
-                                        <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1">Used Pitch</p>
-                                        <p className="text-sm font-serif font-bold text-brand-navy">{solarMeasurements?.predominantPitchRatio || 'Manual Select'}</p>
-                                    </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3 rounded-2xl bg-white border border-brand-navy/10">
+                                    <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1">Base Footprint</p>
+                                    <p className="text-sm font-serif font-bold text-brand-navy">{Math.round(areaSqFt).toLocaleString()}<span className="text-[10px] text-brand-navy/40 ml-1">sq ft</span></p>
                                 </div>
+                                <div className="p-3 rounded-2xl bg-white border border-brand-navy/10">
+                                    <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1">Pitch Used</p>
+                                    <p className="text-sm font-serif font-bold text-brand-navy">{solarMeasurements?.predominantPitchRatio || 'Manual'}</p>
+                                </div>
+                            </div>
 
-                                {!solarMeasurements && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[7px] font-mono font-bold text-brand-navy/40 uppercase ml-2">Pitch Multiplier</label>
-                                            <select
-                                                value={multiplier}
-                                                onChange={(e) => setMultiplier(parseFloat(e.target.value))}
-                                                className="w-full bg-white border border-brand-navy/10 text-[9px] rounded-xl p-2.5 font-bold outline-none appearance-none"
+                            <div className="p-4 rounded-2xl bg-brand-gold/5 border border-brand-gold/10">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase">Waste & Complexity</span>
+                                    {aiMeasurements?.complexity && (
+                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black ${aiMeasurements.complexity === 'SIMPLE' ? 'bg-green-100 text-green-700' :
+                                            aiMeasurements.complexity === 'MODERATE' ? 'bg-yellow-100 text-yellow-700' :
+                                                'bg-red-100 text-red-700'
+                                            }`}>
+                                            {aiMeasurements.complexity}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex gap-2">
+                                    {['10%', '15%', '20%'].map((label, i) => {
+                                        const values = [10, 15, 20];
+                                        const isActive = wasteFactor === values[i];
+                                        return (
+                                            <button
+                                                key={label}
+                                                onClick={() => setWasteFactor(values[i])}
+                                                className={`flex-1 py-2 rounded-xl text-[10px] font-bold border transition-all ${isActive ? 'bg-brand-navy text-white border-brand-navy' : 'bg-white text-brand-navy/60 border-brand-navy/10'
+                                                    }`}
                                             >
-                                                {pitches.map((p) => <option key={p.label} value={p.value}>{p.label.split('(')[0]}</option>)}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[7px] font-mono font-bold text-brand-navy/40 uppercase ml-2">Stories</label>
-                                            <select
-                                                value={numStories}
-                                                onChange={(e) => setNumStories(parseInt(e.target.value))}
-                                                className="w-full bg-white border border-brand-navy/10 text-[9px] rounded-xl p-2.5 font-bold outline-none appearance-none"
-                                            >
-                                                <option value={1}>1 Story</option>
-                                                <option value={2}>2 Stories</option>
-                                                <option value={3}>3+ Stories</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                )}
+                                                {label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         </div>
 
-                        {/* PANEL 2: AI AUTOMATED (LIDAR) */}
                         <div className="flex-1 space-y-6 border-l border-brand-navy/5 pl-8">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Zap className="w-3.5 h-3.5 text-brand-gold" />
-                                <h3 className="text-[10px] font-mono font-bold text-brand-navy/60 uppercase tracking-widest">AI Automated Insights</h3>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <Zap className="w-3.5 h-3.5 text-brand-gold" />
+                                    <h3 className="text-[10px] font-mono font-bold text-brand-navy/60 uppercase tracking-widest">AI Automated Insights</h3>
+                                </div>
+                                {aiMeasurements && (
+                                    <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 text-blue-500 text-[9px] font-black rounded-full border border-blue-500/20 animate-in fade-in zoom-in duration-700">
+                                        <Layers className="w-3 h-3" />
+                                        VISION VERIFIED
+                                    </span>
+                                )}
                             </div>
 
                             {isAnalyzing ? (
-                                <div className="h-[120px] flex flex-col items-center justify-center space-y-4 rounded-3xl bg-brand-gold/5 border border-brand-gold/10">
-                                    <Loader2 className="w-8 h-8 text-brand-gold animate-spin" />
-                                    <div className="text-center">
-                                        <p className="text-[9px] font-mono font-bold text-brand-navy/60 uppercase tracking-[0.2em] animate-pulse">Running LiDAR Analysis</p>
-                                        <p className="text-[7px] font-mono text-brand-navy/30 uppercase mt-1">Estimating linear measurements...</p>
-                                    </div>
+                                <div className="h-[120px] flex flex-col items-center justify-center space-y-3 rounded-3xl bg-brand-gold/5 border border-brand-gold/10 animate-pulse">
+                                    <Loader2 className="w-6 h-6 text-brand-gold animate-spin" />
+                                    <p className="text-[9px] font-mono font-bold text-brand-navy/60 uppercase tracking-widest">Processing LIDAR...</p>
                                 </div>
                             ) : aiMeasurements ? (
-                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="p-4 rounded-2xl bg-brand-gold text-brand-navy shadow-lg shadow-brand-gold/20 flex flex-col items-center">
-                                            <p className="text-[8px] font-mono font-black uppercase mb-1.5 opacity-60">Ridges/Hips</p>
-                                            <p className="text-2xl font-serif font-black">{aiMeasurements.ridgesHipsFeet}<span className="text-[10px] ml-1">ft</span></p>
-                                        </div>
-                                        <div className="p-4 rounded-2xl bg-brand-navy text-white shadow-lg shadow-brand-navy/20 flex flex-col items-center">
-                                            <p className="text-[8px] font-mono font-black uppercase mb-1.5 opacity-60">Valleys</p>
-                                            <p className="text-2xl font-serif font-black">{aiMeasurements.valleysFeet}<span className="text-[10px] ml-1">ft</span></p>
-                                        </div>
-                                        <div className="p-4 rounded-2xl bg-white border border-brand-navy/10 flex flex-col items-center">
-                                            <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1.5">Rakes</p>
-                                            <p className="text-xl font-serif font-bold text-brand-navy">{aiMeasurements.rakesFeet}<span className="text-[10px] ml-1">ft</span></p>
-                                        </div>
-                                        <div className="p-4 rounded-2xl bg-white border border-brand-navy/10 flex flex-col items-center">
-                                            <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1.5">Eaves</p>
-                                            <p className="text-xl font-serif font-bold text-brand-navy">{aiMeasurements.eavesFeet}<span className="text-[10px] ml-1">ft</span></p>
-                                        </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 rounded-2xl bg-brand-gold text-brand-navy flex flex-col items-center">
+                                        <p className="text-[8px] font-black uppercase opacity-60">Ridges/Hips</p>
+                                        <p className="text-xl font-serif font-black">{aiMeasurements.ridgesHipsFeet}ft</p>
                                     </div>
-
-                                    <div className="bg-brand-navy/5 rounded-2xl p-4 flex justify-between items-center">
-                                        <div className="flex flex-col">
-                                            <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1">AI Pitch Recommendation</p>
-                                            <p className="text-sm font-black text-brand-navy">{aiMeasurements.predominantPitch}</p>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <p className="text-[8px] font-mono font-bold text-brand-navy/40 uppercase mb-1">Certainty</p>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-16 h-1.5 bg-brand-navy/10 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-brand-gold transition-all duration-1000 ease-out" style={{ width: `${aiMeasurements.confidenceScore * 100}%` }}></div>
-                                                </div>
-                                                <span className="text-[9px] font-black font-mono text-brand-navy">{Math.round(aiMeasurements.confidenceScore * 100)}%</span>
-                                            </div>
-                                        </div>
+                                    <div className="p-3 rounded-2xl bg-brand-navy text-white flex flex-col items-center">
+                                        <p className="text-[8px] font-black uppercase opacity-60">Valleys</p>
+                                        <p className="text-xl font-serif font-black">{aiMeasurements.valleysFeet}ft</p>
+                                    </div>
+                                    <div className="p-3 rounded-2xl bg-white border border-brand-navy/10 flex flex-col items-center">
+                                        <p className="text-[8px] font-bold text-brand-navy/40 uppercase">Rakes</p>
+                                        <p className="text-lg font-serif font-bold text-brand-navy">{aiMeasurements.rakesFeet}ft</p>
+                                    </div>
+                                    <div className="p-3 rounded-2xl bg-white border border-brand-navy/10 flex flex-col items-center">
+                                        <p className="text-[8px] font-bold text-brand-navy/40 uppercase">Eaves</p>
+                                        <p className="text-lg font-serif font-bold text-brand-navy">{aiMeasurements.eavesFeet}ft</p>
+                                    </div>
+                                    <div className="col-span-2 p-3 rounded-2xl bg-brand-navy/5 border border-dashed border-brand-navy/10">
+                                        <p className="text-[8px] font-bold text-brand-navy/40 uppercase mb-1">AI Reasoning</p>
+                                        <p className="text-[10px] text-brand-navy/80 italic leading-tight">"{aiMeasurements.estimationNotes}"</p>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-[120px] flex flex-col items-center justify-center space-y-2 rounded-3xl border-2 border-dashed border-brand-navy/10 text-brand-navy/30">
-                                    <Zap className="w-6 h-6 opacity-20" />
-                                    <p className="text-[9px] font-mono font-bold uppercase tracking-widest">No AI Data Fetched</p>
+                                <div className="h-[120px] flex flex-col items-center justify-center border-2 border-dashed border-brand-navy/10 rounded-3xl text-brand-navy/20">
+                                    <ShieldCheck className="w-6 h-6 opacity-20" />
+                                    <p className="text-[9px] font-bold uppercase tracking-widest">Pending Analysis</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Methodology & Footer */}
-                    <div className="px-8 pb-8 pt-4 space-y-6">
-                        {showMethodology && (
-                            <div className="p-5 bg-brand-gold/5 border border-brand-gold/10 rounded-2xl text-[10px] text-brand-navy/70 leading-relaxed italic animate-in fade-in zoom-in-95 duration-300 flex items-start gap-3">
-                                <Info className="w-4 h-4 text-brand-gold flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="font-bold text-brand-navy mb-1">Multi-Source Validation:</p>
-                                    {aiMeasurements
-                                        ? `AI Model Estimation: ${aiMeasurements.estimationNotes}`
-                                        : "Standard Hybrid: Using manual footprint tracing multiplied by LiDAR detected pitch and complexity factors."}
-                                </div>
-                            </div>
-                        )}
-
+                    <div className="px-8 pb-8 pt-4">
                         <div className="flex gap-4">
                             <button
                                 onClick={handleSave}
                                 disabled={isAnalyzing}
-                                className="flex-1 bg-brand-navy text-white h-14 rounded-2xl flex items-center justify-center gap-3 hover:bg-brand-gold hover:text-brand-navy transition-all shadow-xl shadow-brand-navy/10 group disabled:opacity-50 font-mono font-bold uppercase tracking-widest text-[11px]"
+                                className="flex-1 bg-brand-navy text-white h-14 rounded-2xl flex items-center justify-center gap-3 hover:bg-brand-gold hover:text-brand-navy transition-all font-mono font-bold uppercase tracking-widest text-[11px] disabled:opacity-50"
                             >
-                                <TrendingUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                Download Full Scope
+                                <TrendingUp className="w-4 h-4" />
+                                Download Report
                             </button>
                             {(hasSaved || aiMeasurements) && (
                                 <button
-                                    onClick={() => alert('Proceeding to order materials...')}
-                                    className="px-8 bg-brand-gold text-brand-navy h-14 rounded-2xl flex items-center justify-center gap-3 hover:bg-brand-navy hover:text-white transition-all shadow-xl shadow-brand-gold/10 animate-in fade-in slide-in-from-right-4 duration-500 font-mono font-bold uppercase tracking-widest text-[11px]"
+                                    onClick={() => alert('Order integration coming soon!')}
+                                    className="px-8 bg-brand-gold text-brand-navy h-14 rounded-2xl flex items-center justify-center gap-3 hover:bg-brand-navy hover:text-white transition-all font-mono font-bold uppercase tracking-widest text-[11px]"
                                 >
                                     Order Materials
                                     <ArrowRight className="w-4 h-4" />

@@ -1,10 +1,41 @@
 # Roof Measurement Calculation
 
+## Setup Instructions
+
+### 1. Create Environment File
+Copy `.env.example` to `.env` and add your API keys:
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and add:
+- **VITE_GOOGLE_MAPS_API_KEY**: Get from [Google Cloud Console](https://console.cloud.google.com/)
+- **VITE_ANTHROPIC_API_KEY**: Get from [Anthropic Console](https://console.anthropic.com/)
+
+### 2. Enable Required Google APIs
+In Google Cloud Console, enable these APIs for your project:
+1. **Maps JavaScript API** - For map display and interaction
+2. **Places API** - For address search and autocomplete
+3. **Solar API** - For building insights (roof data)
+
+See [Google Places Migration Guide](https://developers.google.com/maps/documentation/javascript/places-migration-overview) for details.
+
+### 3. Install Dependencies & Run
+```bash
+npm install
+npm run dev
+```
+
+The app will be available at `http://localhost:5173/roof/`
+
+---
+
 ## Currently Active APIs
 
-- **Address Search**: [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) (Free, no API key required)
-- **Satellite Imagery**: [Esri World Imagery](https://www.esri.com/en-us/arcgis/products/arcgis-platform/services/world-imagery)
-- **Map Labels**: [Stamen Toner Labels](http://maps.stamen.com/toner-labels/)
+- **Address Search**: [Google Places API](https://developers.google.com/maps/documentation/places/web-service/overview) (Requires API key)
+- **Map Display**: Google Maps JavaScript API
+- **Building Data**: [Google Solar API](https://developers.google.com/solar)
+- **AI Analysis**: [Anthropic Claude API](https://www.anthropic.com/)
 
 ---
 
