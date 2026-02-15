@@ -86,11 +86,20 @@ RETURN ONLY A JSON OBJECT with these exact keys:
             }
         ];
 
-        const isDev = import.meta.env.DEV;
+        const isGitHub = window.location.hostname.includes('github.io');
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
-        // Use proxy in dev, direct URL in prod (GitHub Pages)
-        const url = isDev ? '/api/anthropic' : 'https://api.anthropic.com/v1/messages';
+        // Use proxy in local dev, direct URL in prod (GitHub Pages)
+        const url = (isGitHub || !isLocal) ? 'https://api.anthropic.com/v1/messages' : '/api/anthropic';
+
+        console.info('[AI] Environment Diagnostics:', {
+            hostname: window.location.hostname,
+            isGitHub,
+            isLocal,
+            targetingUrl: url,
+            hasApiKey: !!apiKey
+        });
 
         const headers = {
             'Content-Type': 'application/json'
@@ -98,7 +107,7 @@ RETURN ONLY A JSON OBJECT with these exact keys:
 
         // If in production/static environment, we must provide headers directly
         // WARNING: This exposes the API key in the browser.
-        if (!isDev) {
+        if (isGitHub || !isLocal) {
             headers['x-api-key'] = apiKey;
             headers['anthropic-version'] = '2023-06-01';
             headers['anthropic-dangerous-direct-browser-access'] = 'true';

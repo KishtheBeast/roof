@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon, ImageOverlay, Pane } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -196,6 +196,14 @@ export default function RoofMap({ center, zoom, solarData, suggestedFootprint, o
         onPolygonUpdate(null);
     }, [onPolygonUpdate]);
 
+    // Calculate building bounds if we have a suggested footprint
+    const buildingBounds = useMemo(() => {
+        if (suggestedFootprint && suggestedFootprint.length > 0) {
+            return L.latLngBounds(suggestedFootprint);
+        }
+        return null;
+    }, [suggestedFootprint]);
+
     return (
         <div className={`h-full w-full flex justify-center transition-all duration-700 ${isAnalysisMode ? 'bg-brand-navy items-start pt-16' : 'items-center'}`}>
             <div
@@ -218,7 +226,7 @@ export default function RoofMap({ center, zoom, solarData, suggestedFootprint, o
                     <ChangeView
                         center={center}
                         zoom={zoom}
-                        bounds={rgbOverlay?.bounds}
+                        bounds={isAnalysisMode ? buildingBounds : (rgbOverlay?.bounds || buildingBounds)}
                         isAnalysisMode={isAnalysisMode}
                     />
 
