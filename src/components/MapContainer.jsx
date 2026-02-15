@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, FeatureGroup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
@@ -135,14 +135,67 @@ function DrawControl({ center, solarData, onCreated, onDeleted, onEdited }) {
         const polygon = L.polygon(defaultBox, drawStyle);
         featureGroupRef.current.addLayer(polygon);
 
+        // --- Custom Dragging Logic (Move the whole box) ---
+        let isMoving = false;
+        let lastLatLng = null;
+
+        polygon.on('mousedown', (e) => {
+            // Only start moving if we are clicking the polygon itself, not a vertex marker
+            // Vertex markers have their own handlers in leaflet-draw
+            if (e.originalEvent.target.classList.contains('leaflet-interactive')) {
+                isMoving = true;
+                lastLatLng = e.latlng;
+                map.dragging.disable();
+                L.DomEvent.stopPropagation(e);
+            }
+        });
+
+        const handleMouseMove = (e) => {
+            if (!isMoving || !lastLatLng) return;
+
+            const deltaLat = e.latlng.lat - lastLatLng.lat;
+            const deltaLng = e.latlng.lng - lastLatLng.lng;
+
+            const latlngs = polygon.getLatLngs()[0];
+            const newLatlngs = latlngs.map(p => ({
+                lat: p.lat + deltaLat,
+                lng: p.lng + deltaLng
+            }));
+
+            polygon.setLatLngs([newLatlngs]);
+            lastLatLng = e.latlng;
+
+            // Trigger real-time update for measurement numbers
+            if (onEdited) {
+                const mockLayers = {
+                    eachLayer: (cb) => cb(polygon)
+                };
+                onEdited(mockLayers);
+            }
+        };
+
+        const handleMouseUp = () => {
+            if (isMoving) {
+                isMoving = false;
+                lastLatLng = null;
+                map.dragging.enable();
+            }
+        };
+
+        map.on('mousemove', handleMouseMove);
+        map.on('mouseup', handleMouseUp);
+        // --------------------------------------------------
+
         if (onCreated) onCreated(polygon);
 
         if (polygon.editing) {
             polygon.editing.enable();
         }
 
-        // IMPORTANT: Added solarData to dependencies so that clearing solar data (Manual Init)
-        // re-triggers the box creation.
+        return () => {
+            map.off('mousemove', handleMouseMove);
+            map.off('mouseup', handleMouseUp);
+        };
     }, [center[0], center[1], solarData]);
 
     return null;
@@ -194,6 +247,21 @@ export default function RoofMap({ center, zoom, solarData, onPolygonUpdate }) {
                 onEdited={handleEdited}
                 onDeleted={handleDeleted}
             />
+
+            {/* AI Automated House Highlight */}
+            {solarData?.boundingPoly?.vertices && (
+                <Polygon
+                    positions={solarData.boundingPoly.vertices.map(v => [v.latitude, v.longitude])}
+                    pathOptions={{
+                        color: '#fbbf24', // brand-gold
+                        weight: 4,
+                        opacity: 0.8,
+                        fillColor: '#fbbf24',
+                        fillOpacity: 0.1,
+                        dashArray: '5, 10'
+                    }}
+                />
+            )}
         </MapContainer>
     );
 }

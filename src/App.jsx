@@ -3,8 +3,9 @@ import RoofMap from './components/MapContainer';
 import AddressSearch from './components/AddressSearch';
 import MeasurementDisplay from './components/MeasurementDisplay';
 import { calculatePolygonArea } from './utils/calculateArea';
-import { fetchBuildingInsights } from './utils/solarApi';
-import { Ruler, Maximize, Shield, ArrowRight } from 'lucide-react';
+import { fetchBuildingInsights, processSolarData } from './utils/solarApi';
+import { analyzeRoofWithClaude } from './utils/anthropicApi';
+import { Ruler, Maximize, Shield, ArrowRight, Loader2 } from 'lucide-react';
 
 function App() {
     const [mapCenter, setMapCenter] = useState([39.6368, -74.8035]); // Default: South Jersey (Hammonton area)
@@ -12,6 +13,8 @@ function App() {
     const [areaSqFt, setAreaSqFt] = useState(0);
     const [hasLocation, setHasLocation] = useState(false);
     const [solarData, setSolarData] = useState(null);
+    const [aiMeasurements, setAiMeasurements] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const handleLocationSelect = React.useCallback(async (location) => {
         setMapCenter([location.lat, location.lon]);
@@ -22,6 +25,20 @@ function App() {
         // Fetch professional LiDAR data
         const data = await fetchBuildingInsights(location.lat, location.lon);
         setSolarData(data);
+
+        // Auto-run AI analysis if solar data is available
+        if (data) {
+            setIsAnalyzing(true);
+            try {
+                const processed = processSolarData(data);
+                const aiResult = await analyzeRoofWithClaude(processed, data);
+                setAiMeasurements(aiResult);
+            } catch (err) {
+                console.error('AI Analysis failed:', err);
+            } finally {
+                setIsAnalyzing(false);
+            }
+        }
     }, []);
 
     const handlePolygonUpdate = React.useCallback((layer) => {
@@ -142,7 +159,12 @@ function App() {
 
                     {/* Bottom: Measurement Details Panel */}
                     <div className="flex-none relative z-[1000]">
-                        <MeasurementDisplay areaSqFt={areaSqFt} solarData={solarData} />
+                        <MeasurementDisplay
+                            areaSqFt={areaSqFt}
+                            solarData={solarData}
+                            aiMeasurements={aiMeasurements}
+                            isAnalyzing={isAnalyzing}
+                        />
                     </div>
 
                 </div>
