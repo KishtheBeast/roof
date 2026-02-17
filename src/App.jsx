@@ -10,6 +10,7 @@ import { analyzeRoofWithClaude } from './utils/anthropicApi';
 import { Ruler, Maximize, Shield, TrendingUp, ArrowLeft, ShieldCheck } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
+import { loginWithApiKey, api } from './utils/auth';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -34,7 +35,18 @@ async function initializeGoogleMaps() {
 
 initializeGoogleMaps().catch(e => console.error('[Google Maps] Init Promise Error:', e));
 
+const ROOF_API_KEY = import.meta.env.VITE_ROOF_API_KEY;
+
 function App() {
+    // Authenticate with backend on mount
+    useEffect(() => {
+        if (ROOF_API_KEY) {
+            loginWithApiKey(ROOF_API_KEY);
+        } else {
+            console.warn("⚠️ VITE_ROOF_API_KEY is missing in .env");
+        }
+    }, []);
+
     const [mapCenter, setMapCenter] = useState([39.6368, -74.8035]);
     const [mapZoom, setMapZoom] = useState(18);
     const [areaSqFt, setAreaSqFt] = useState(0);
@@ -83,17 +95,11 @@ function App() {
         setIsLoadingSolar(true);
 
         try {
-            const response = await fetch('http://localhost:8000/analyze-roof', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ address: addressToAnalyze })
-            });
+            // Use authenticated API client
+            const response = await api.post('/analyze-roof', { address: addressToAnalyze });
 
-            const data = await response.json();
+            const data = response.data;
 
-            // Transform API response
             // Transform API response to match UI needs
             const aiResult = {
                 totalAreaSqFt: data.total_area_sqft,
@@ -122,6 +128,7 @@ function App() {
 
         } catch (err) {
             console.error('AI Analysis failed:', err);
+            // Optional: Show error to user
         } finally {
             setIsAnalyzing(false);
             setIsLoadingSolar(false); // Hide loading screen

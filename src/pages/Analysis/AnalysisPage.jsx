@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, ArrowLeft, Ruler, Activity, CheckCircle2, ChevronRight, Info } from 'lucide-react';
+import { api } from '../../utils/auth';
 
 const AnalysisPage = ({ address, onBack }) => {
     const [data, setData] = useState(null);
@@ -9,21 +10,13 @@ const AnalysisPage = ({ address, onBack }) => {
     useEffect(() => {
         const fetchAnalysis = async () => {
             try {
-                const response = await fetch('http://localhost:8000/analyze-roof', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ address: address })
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch analysis data');
-
-                const result = await response.json();
-                setData(result);
+                // Use the authenticated API instance (handles tokens automatically)
+                const response = await api.post('/analyze-roof', { address });
+                setData(response.data);
             } catch (err) {
                 console.error('Error fetching analysis:', err);
-                setError(err.message);
+                const errorMessage = err.response?.data?.detail || err.message || 'Failed to fetch analysis data';
+                setError(errorMessage);
             } finally {
                 setIsLoading(false);
             }
