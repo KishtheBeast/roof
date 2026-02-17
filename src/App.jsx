@@ -7,7 +7,7 @@ import { calculatePolygonArea } from './utils/calculateArea';
 import { fetchBuildingInsights, fetchSolarDataLayers, processSolarData } from './utils/solarApi';
 import { geoTiffToDataUrl } from './utils/geotiffUtils';
 import { analyzeRoofWithClaude } from './utils/anthropicApi';
-import { Ruler, Maximize, Shield, TrendingUp } from 'lucide-react';
+import { Ruler, Maximize, Shield, TrendingUp, ArrowLeft, ShieldCheck } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 
@@ -51,106 +51,83 @@ function App() {
 
 
     const handleLocationSelect = React.useCallback(async (location) => {
+        // Start "Loading" state - this will trigger the loading screen UI
         setIsLoadingSolar(true);
         setHasLocation(false);
+
         setMapCenter([location.lat, location.lon]);
-        setMapZoom(21);
+        setMapZoom(20);
         setAreaSqFt(0);
         setSuggestedFootprint(null);
         setSelectedAddress(location.address || '');
         setRgbOverlay(null);
+        setSolarData(null); // clear old data
+        setAiMeasurements(null); // clear old analysis
 
-        try {
-            const data = await fetchBuildingInsights(location.lat, location.lon);
-            setSolarData(data);
+        // SKIP Google Solar API calls as requested.
+        // We go straight to local AI analysis.
 
-            if (data) {
-                const buildingLat = data.center?.latitude || location.lat;
-                const buildingLng = data.center?.longitude || location.lon;
-                setMapCenter([buildingLat, buildingLng]);
-                setMapZoom(20);
+        // Short timeout to allow state to settle, then trigger analysis
+        setTimeout(() => {
+            triggerAiAnalysis(location.address);
+        }, 100);
 
-                const layers = await fetchSolarDataLayers(buildingLat, buildingLng, 50);
-                if (layers && layers.rgbUrl) {
-                    const overlay = await geoTiffToDataUrl(layers.rgbUrl, API_KEY, [buildingLat, buildingLng]);
-                    if (overlay && overlay.bounds) {
-                        setRgbOverlay(overlay);
-                    }
-                }
+    }, []);
 
-                if (data.boundingPoly?.vertices) {
-                    const footprint = data.boundingPoly.vertices.map(v => [v.latitude, v.longitude]);
-                    setSuggestedFootprint(footprint);
-
-                    const processed = processSolarData(data);
-                    if (processed?.totalAreaSqFt) {
-                        setAreaSqFt(processed.totalAreaSqFt);
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("Error loading location details:", e);
-        } finally {
-            setIsLoadingSolar(false);
-            setHasLocation(true);
-        }
-    }, [API_KEY]);
-
-    const triggerAiAnalysis = React.useCallback(async () => {
-        if (!solarData) return;
+    const triggerAiAnalysis = React.useCallback(async (addressOverride) => {
+        const addressToAnalyze = addressOverride || selectedAddress;
+        if (!addressToAnalyze) return;
 
         setIsAnalyzing(true);
+        // Ensure loading screen stays up if called from handleLocationSelect
+        setIsLoadingSolar(true);
+
         try {
-            let finalImage = null;
-            let imageBounds = null;
+            const response = await fetch('http://localhost:8000/analyze-roof', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ address: addressToAnalyze })
+            });
 
-            if (rgbOverlay && rgbOverlay.url) {
-                finalImage = rgbOverlay.url;
-                imageBounds = {
-                    south: rgbOverlay.bounds[0][0],
-                    west: rgbOverlay.bounds[0][1],
-                    north: rgbOverlay.bounds[1][0],
-                    east: rgbOverlay.bounds[1][1]
-                };
-            } else {
-                const mapElement = document.querySelector('.leaflet-container');
-                if (!mapElement) return;
+            const data = await response.json();
 
-                const canvas = await html2canvas(mapElement, {
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: null,
-                    logging: false
-                });
-                finalImage = canvas.toDataURL('image/png');
+            // Transform API response
+            // Transform API response to match UI needs
+            const aiResult = {
+                totalAreaSqFt: data.total_area_sqft,
+                footprintSqFt: data.total_area_sqft, // Using total area as footprint for now based on backend
+                pitch: data.predominant_pitch,
+                ridges: data.ridges_hips,
+                valleys: data.valleys,
+                rakes: data.rakes,
+                eaves: data.eaves,
+                material: data.material,
+                confidenceScore: 0.98,
+                estimationNotes: data.reasoning
+            };
 
-                const mapInstance = window.L?.DomUtil.get(mapElement)?._leaflet_map;
-                if (mapInstance) {
-                    const bounds = mapInstance.getBounds();
-                    imageBounds = {
-                        north: bounds.getNorth(),
-                        south: bounds.getSouth(),
-                        east: bounds.getEast(),
-                        west: bounds.getWest()
-                    };
-                }
-            }
-
-            const processed = processSolarData(solarData);
-            const aiResult = await analyzeRoofWithClaude(processed, solarData, finalImage, selectedAddress);
             setAiMeasurements(aiResult);
 
-            if (aiResult?.estimatedGroundAreaSqFt) {
-                setAreaSqFt(aiResult.estimatedGroundAreaSqFt);
+            if (data.total_area_sqft) {
+                setAreaSqFt(data.total_area_sqft);
             }
+
+            if (data.full_image_base64) {
+                const imageUrl = `data:image/jpeg;base64,${data.full_image_base64}`;
+                aiResult.highlightedImage = imageUrl;
+                setAiMeasurements({ ...aiResult });
+            }
+
         } catch (err) {
             console.error('AI Analysis failed:', err);
         } finally {
             setIsAnalyzing(false);
-            setIsLoadingSolar(false);
-            setHasLocation(true);
+            setIsLoadingSolar(false); // Hide loading screen
+            setHasLocation(true); // Show dashboard
         }
-    }, [solarData, selectedAddress, rgbOverlay]);
+    }, [selectedAddress]);
 
     const handlePolygonUpdate = React.useCallback((layer) => {
         currentPolygonRef.current = layer;
@@ -161,6 +138,16 @@ function App() {
             setAreaSqFt(0);
         }
     }, []);
+
+    // Auto-trigger AI analysis when solar data is loaded
+    React.useEffect(() => {
+        if (solarData && hasLocation && !isAnalyzing && !aiMeasurements) {
+            const timer = setTimeout(() => {
+                triggerAiAnalysis();
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [solarData, hasLocation, isAnalyzing, aiMeasurements, triggerAiAnalysis]);
 
     const handleDevManualInit = () => {
         setSolarData(null);
@@ -190,130 +177,104 @@ function App() {
                                 <AddressSearch onLocationSelect={handleLocationSelect} className="w-full relative z-20" />
                                 <div className="absolute -inset-1 bg-brand-gold/20 rounded-lg blur-2xl opacity-50"></div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left mt-8">
-                                <div className="p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-all hover:bg-white/10">
-                                    <Maximize className="w-8 h-8 text-brand-gold mb-4" />
-                                    <h3 className="text-xl font-serif font-bold mb-2">Auto-Measure</h3>
-                                    <p className="text-sm text-gray-400 leading-relaxed">Smart detection algorithms instantly outline and calculate roof surface area.</p>
-                                </div>
-                                <div className="p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-all hover:bg-white/10">
-                                    <Ruler className="w-8 h-8 text-brand-gold mb-4" />
-                                    <h3 className="text-xl font-serif font-bold mb-2">Pitch & Waste</h3>
-                                    <p className="text-sm text-gray-400 leading-relaxed">Adjust for roof slope and material waste factors for precise estimation.</p>
-                                </div>
-                                <div className="p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur transition-all hover:bg-white/10">
-                                    <Shield className="w-8 h-8 text-brand-gold mb-4" />
-                                    <h3 className="text-xl font-serif font-bold mb-2">High-Res Imagery</h3>
-                                    <p className="text-sm text-gray-400 leading-relaxed">Powered by Solar API for crystal clear views up to zoom level 22.</p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Loading Solar State */}
+                {/* Loading Solar State - Full Screen Overlay */}
                 {isLoadingSolar && (
-                    <div className="flex-1 h-full flex flex-col items-center justify-center bg-brand-navy text-white">
-                        <div className="relative">
-                            <div className="w-16 h-16 border-4 border-brand-gold/20 border-t-brand-gold rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-brand-navy text-white">
+                        <div className="relative mb-8">
+                            <div className="w-24 h-24 border-4 border-brand-gold/20 rounded-full"></div>
+                            <div className="absolute inset-0 border-4 border-brand-gold border-t-transparent rounded-full animate-spin"></div>
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <Maximize className="w-6 h-6 text-brand-gold" />
+                                <Maximize className="w-8 h-8 text-brand-gold animate-pulse" />
                             </div>
                         </div>
-                        <h2 className="mt-6 text-xl font-serif font-black tracking-widest uppercase">Fetching LIDAR...</h2>
-                        <p className="mt-2 text-white/40 font-mono text-[10px] uppercase tracking-[0.3em]">Preparing High-Resolution Roof Analysis</p>
+
+                        <h2 className="text-3xl font-serif font-black tracking-widest uppercase mb-4">Analyzing Geometry</h2>
+
+                        {/* Progress Bar Container */}
+                        <div className="w-64 h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
+                            <div className="h-full bg-brand-gold animate-[progress_12s_ease-in-out_forwards] w-full origin-left"></div>
+                        </div>
+
+                        <p className="text-brand-gold/60 font-mono text-[10px] uppercase tracking-[0.3em] animate-pulse">
+                            Processing Satellite Imagery...
+                        </p>
+
+                        <style>{`
+                            @keyframes progress {
+                                0% { transform: scaleX(0); }
+                                20% { transform: scaleX(0.4); }
+                                50% { transform: scaleX(0.6); }
+                                80% { transform: scaleX(0.8); }
+                                100% { transform: scaleX(1); }
+                            }
+                        `}</style>
                     </div>
                 )}
 
-                {/* Map Application Mode - Full Screen Immersive Layout */}
-                {hasLocation && !isLoadingSolar && (
-                    <div className="h-full w-full relative">
-                        {/* Full Screen Map (100%) */}
-                        <div className="absolute inset-0 z-0 h-full w-full">
-                            <RoofMap
-                                center={mapCenter}
-                                zoom={mapZoom}
-                                solarData={solarData}
-                                suggestedFootprint={suggestedFootprint}
-                                onPolygonUpdate={handlePolygonUpdate}
-                                rgbOverlay={rgbOverlay}
-                                isAnalysisMode={!!rgbOverlay}
-                            />
-                        </div>
-
-                        {/* Pro-Mode Header: Focus Mode Indicator & Instructions */}
-                        <div className="absolute top-0 left-0 right-0 h-1 z-[2100] bg-gradient-to-r from-transparent via-brand-gold/50 to-transparent"></div>
-                        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[2200] pointer-events-none w-full flex justify-center">
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="flex items-center gap-4 bg-brand-navy/60 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 shadow-2xl">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_8px_rgba(251,191,36,0.8)]"></div>
-                                        <span className="text-[10px] text-brand-gold font-mono font-black tracking-[0.4em] uppercase">Solar Vision</span>
-                                    </div>
-                                    <div className="w-[1px] h-3 bg-white/20"></div>
-                                    <span className="text-[10px] text-white/40 font-mono tracking-widest uppercase italic">
-                                        {rgbOverlay ? 'Studio Analysis Active' : 'High-Precision Capture Active'}
+                {/* Analysis Results View - Replaces Map */}
+                {hasLocation && !isLoadingSolar && aiMeasurements && (
+                    <div className="absolute inset-0 z-0 h-full w-full bg-brand-beige flex flex-col animate-in fade-in duration-500">
+                        {/* Header */}
+                        <div className="h-20 bg-brand-navy flex items-center justify-between px-8 border-b border-white/10 shrink-0 shadow-lg z-10">
+                            <div className="flex items-center gap-6">
+                                <div className="p-2 bg-brand-gold rounded-lg">
+                                    <ShieldCheck className="w-6 h-6 text-brand-navy" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-white font-serif font-black text-xl tracking-tight">{selectedAddress}</span>
+                                    <span className="text-brand-gold text-xs font-mono uppercase tracking-[0.2em] flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                                        AI Analysis Complete
                                     </span>
                                 </div>
-
-                                {rgbOverlay && (
-                                    <div className="bg-brand-navy/80 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 shadow-2xl skew-x-[-10deg] pointer-events-auto">
-                                        <span className="block text-[12px] text-white font-mono font-bold tracking-[0.2em] uppercase skew-x-[10deg]">
-                                            Use the drawing tool to highlight your roof
-                                        </span>
-                                    </div>
-                                )}
                             </div>
+                            <button
+                                onClick={() => {
+                                    setHasLocation(false);
+                                    setAiMeasurements(null);
+                                    setSelectedAddress('');
+                                    setSolarData(null);
+                                }}
+                                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/5 transition-all text-xs font-mono font-bold uppercase tracking-widest flex items-center gap-2 group"
+                            >
+                                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                                New Search
+                            </button>
                         </div>
 
-                        {/* Overlay: Address Search & Analysis Headers */}
-                        {!rgbOverlay && (
-                            <div className="absolute top-6 left-6 right-6 z-[2000] flex items-center gap-3">
-                                <div className="max-w-xl flex-1 backdrop-blur-md bg-white/5 rounded-3xl border border-white/10 overflow-hidden shadow-2xl transition-all duration-500 hover:bg-white/10">
-                                    <AddressSearch onLocationSelect={handleLocationSelect} className="relative w-full" />
-                                </div>
+                        {/* Content */}
+                        <div className="flex-1 overflow-hidden relative p-8 bg-brand-beige">
+                            <div className="h-full w-full bg-white rounded-[3rem] shadow-2xl border border-brand-navy/5 overflow-hidden">
+                                <MeasurementDisplay
+                                    areaSqFt={areaSqFt}
+                                    solarData={null}
+                                    aiMeasurements={aiMeasurements}
+                                    isAnalyzing={false}
+                                    address={selectedAddress}
+                                />
                             </div>
-                        )}
+                        </div>
+                    </div>
+                )}
 
-                        {hasLocation && solarData && (
-                            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[2000] flex items-center gap-2">
-                                <button
-                                    onClick={triggerAiAnalysis}
-                                    disabled={isAnalyzing}
-                                    className={`px-12 py-6 rounded-[2.5rem] font-black text-[12px] tracking-[0.2em] uppercase shadow-[0_30px_60px_rgba(0,0,0,0.5)] transition-all duration-300 flex items-center gap-4 group border border-white/20 backdrop-blur-2xl ${isAnalyzing
-                                        ? 'bg-brand-navy/80 text-white/50 cursor-not-allowed'
-                                        : 'bg-brand-gold text-brand-navy hover:scale-105 active:scale-95'
-                                        }`}
-                                >
-                                    <Shield className={`w-6 h-6 ${isAnalyzing ? 'animate-pulse' : 'group-hover:rotate-12 transition-transform'}`} />
-                                    {isAnalyzing ? 'Analyzing Roof Geometry...' : 'Analyze Building'}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Floating Overlay: Measurement Details Panel - ONLY shown during/after analysis */}
-                        {(isAnalyzing || aiMeasurements) && (
-                            <div className="absolute bottom-10 left-10 right-10 z-[3000] flex justify-center pointer-events-none animate-in slide-in-from-bottom duration-700">
-                                <div className="w-full max-w-6xl h-[320px] pointer-events-auto rounded-[40px] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] border border-white/10 backdrop-blur-2xl bg-brand-navy/85 transition-all duration-500">
-                                    <MeasurementDisplay
-                                        areaSqFt={areaSqFt}
-                                        solarData={solarData}
-                                        aiMeasurements={aiMeasurements}
-                                        isAnalyzing={isAnalyzing}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Global Overrides for Leaflet Draw to hide toolbar */}
-                        <style>{`
-                        .leaflet-draw-toolbar {
-                            display: none !important;
-                        }
-                    `}</style>
-
-                        {/* Subtle Corner Vignette */}
-                        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-brand-navy/30 via-transparent to-brand-navy/50 z-[1]"></div>
+                {/* Fallback / Error State */}
+                {hasLocation && !isLoadingSolar && !aiMeasurements && (
+                    <div className="h-full w-full flex flex-col items-center justify-center bg-brand-navy text-white">
+                        <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur text-center max-w-md">
+                            <Shield className="w-12 h-12 text-brand-gold mx-auto mb-6 opacity-50" />
+                            <h3 className="text-2xl font-serif font-bold mb-2">Analysis Pending...</h3>
+                            <p className="text-white/40 mb-8">Data processing in progress.</p>
+                            <button
+                                onClick={() => triggerAiAnalysis()}
+                                className="px-8 py-3 bg-brand-gold text-brand-navy font-bold rounded-xl uppercase tracking-widest hover:scale-105 transition-transform"
+                            >
+                                Retry Analysis
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
