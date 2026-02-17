@@ -31,11 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Build
-        run: npm run build
+        run: npm run prod
         env:
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          VITE_ANTHROPIC_API_KEY: ${{ secrets.VITE_ANTHROPIC_API_KEY }}
           VITE_APP_PASSWORD: ${{ secrets.VITE_APP_PASSWORD }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_ROOF_API_KEY: ${{ secrets.VITE_ROOF_API_KEY }}
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact

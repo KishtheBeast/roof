@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configuration
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const ROOF_API_KEY = import.meta.env.VITE_ROOF_API_KEY || "YOUR_ROOF_API_KEY"; // Fallback for dev
 
 // Create Axios Instance
