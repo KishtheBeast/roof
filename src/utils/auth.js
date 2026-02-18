@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Configuration
 const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-const ROOF_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || "YOUR_ROOF_API_KEY"; // Fallback for dev
+const ROOF_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || "";
 
 // Create Axios Instance
 export const api = axios.create({

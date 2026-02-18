@@ -35,7 +35,7 @@ async function initializeGoogleMaps() {
 
 initializeGoogleMaps().catch(e => console.error('[Google Maps] Init Promise Error:', e));
 
-const ROOF_API_KEY = import.meta.env.VITE_ROOF_API_KEY;
+const ROOF_API_KEY = import.meta.env.VITE_BACKEND_API_KEY;
 
 function App() {
     // Authenticate with backend on mount
@@ -43,7 +43,7 @@ function App() {
         if (ROOF_API_KEY) {
             loginWithApiKey(ROOF_API_KEY);
         } else {
-            console.warn("⚠️ VITE_ROOF_API_KEY is missing in .env");
+            console.warn("⚠️ VITE_BACKEND_API_KEY is missing in .env");
         }
     }, []);
 
