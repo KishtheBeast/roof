@@ -16,6 +16,36 @@ const ACCESS_TOKEN_KEY = 'roof_access_token';
 // State
 let isRefreshing = false;
 let failedQueue = [];
+let refreshTimer = null;
+
+// Token refresh interval (55 minutes in ms - before 60min expiry)
+const TOKEN_REFRESH_INTERVAL = 55 * 60 * 1000;
+
+// Helper: Start auto-refresh timer
+const startRefreshTimer = () => {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(async () => {
+        if (getAccessToken()) {
+            console.log("⏰ Auto-refreshing token (55 min interval)...");
+            try {
+                const response = await api.post('/refresh');
+                const { access_token } = response.data;
+                setAccessToken(access_token);
+                console.log("✅ Token auto-refresh successful");
+            } catch (err) {
+                console.error("❌ Token auto-refresh failed:", err);
+            }
+        }
+    }, TOKEN_REFRESH_INTERVAL);
+};
+
+// Helper: Stop auto-refresh timer
+const stopRefreshTimer = () => {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+};
 
 // Helper: Process Failed Queue
 const processQueue = (error, token = null) => {
@@ -39,6 +69,7 @@ export const loginWithApiKey = async (apiKey) => {
 
         const { access_token } = response.data;
         setAccessToken(access_token);
+        startRefreshTimer(); // Start auto-refresh timer
         console.log("✅ Authentication successful");
         return true;
     } catch (error) {
@@ -53,6 +84,13 @@ export const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
 // Set Token
 export const setAccessToken = (token) => {
     localStorage.setItem(ACCESS_TOKEN_KEY, token);
+};
+
+// Logout - clear token and stop refresh timer
+export const logout = () => {
+    stopRefreshTimer();
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    console.log("👋 Logged out and timer stopped");
 };
 
 // Axios Request Interceptor: Attach Token
@@ -98,6 +136,7 @@ api.interceptors.response.use(
 
                 const { access_token } = response.data;
                 setAccessToken(access_token);
+                startRefreshTimer(); // Restart auto-refresh timer
 
                 console.log("✅ Token refresh successful");
 
