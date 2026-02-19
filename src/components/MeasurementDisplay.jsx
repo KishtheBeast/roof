@@ -1,55 +1,61 @@
 import React from 'react';
 import { ShieldCheck, Info, Zap, Layers, TrendingUp, Calculator, MousePointer2, Loader2, ArrowRight, Ruler, History, Maximize } from 'lucide-react';
-import { processSolarData } from '../utils/solarApi';
 
-export default function MeasurementDisplay({ areaSqFt, solarData, aiMeasurements, isAnalyzing, address }) {
-    // Process Solar API data
-    const solarMeasurements = solarData ? processSolarData(solarData) : null;
-
-    // Pitch multipliers (Standard defaults)
-    const pitches = [
-        { label: 'Flat Roof', value: 1.00 },
-        { label: 'Low Slope', value: 1.05 },
-        { label: 'Standard House', value: 1.12 },
-        { label: 'Steep', value: 1.25 },
-        { label: 'Very Steep', value: 1.40 },
-    ];
-
-    const [multiplier, setMultiplier] = React.useState(1.12);
+export default function MeasurementDisplay({ areaSqFt, aiMeasurements, isAnalyzing, address }) {
     const [hasSaved, setHasSaved] = React.useState(false);
-    const [showMethodology, setShowMethodology] = React.useState(false);
-
-    // Derived area (Hybrid) 
-    // If we have solar data + manual/ai area, use specialized hybrid math
-    const solarPitchDegrees = solarMeasurements?.predominantPitchDegrees || 0;
-    const solarPitchMultiplier = solarPitchDegrees > 0 ? (1 / Math.cos(solarPitchDegrees * Math.PI / 180)) : multiplier;
-
-    // finalDisplayArea uses the areaSqFt (auto-set by AI or manual) 
-    const finalDisplayArea = (areaSqFt || 0) * solarPitchMultiplier;
 
     const handleSave = () => {
         const report = `
 ROOF MEASUREMENT REPORT
-----------------------------------
+==================================
 DATE: ${new Date().toLocaleString()}
-STATUS: ${aiMeasurements ? 'AI ANALYZED' : 'MANUAL/LIDAR HYBRID'}
+ADDRESS: ${address || 'Unknown'}
 
-PRIMARY ESTIMATE
-- Total Surface Area: ${Math.round(finalDisplayArea).toLocaleString()} sq ft
-- Base Ground Area: ${Math.round(areaSqFt).toLocaleString()} sq ft
-- Applied Pitch: ${solarMeasurements?.predominantPitchRatio || 'Manual'}
+==================================
+AREA MEASUREMENTS
+==================================
+Total Surface Area: ${Math.round(aiMeasurements?.totalAreaSqFt || areaSqFt || 0).toLocaleString()} sq ft
 
-${aiMeasurements ? `AI AUTOMATED INSIGHTS
-- Total Ridges/Hips: ${aiMeasurements.ridgesHipsFeet} ft
-- Total Valleys: ${aiMeasurements.valleysFeet} ft
-- Total Rakes: ${aiMeasurements.rakesFeet} ft
-- Total Eaves: ${aiMeasurements.eavesFeet} ft
-- Complexity: ${aiMeasurements.complexity}
-- Confidence: ${Math.round(aiMeasurements.confidenceScore * 100)}%
-- Notes: ${aiMeasurements.estimationNotes}` : ''}
+==================================
+ROOF GEOMETRY
+==================================
+Predominant Pitch: ${aiMeasurements?.pitch || 'Standard'}
+Roof Facets: ${aiMeasurements?.facetCount || 'N/A'}
+Complexity: ${aiMeasurements?.complexity || 'Unknown'}
+Confidence Score: ${Math.round((aiMeasurements?.confidenceScore || 0) * 100)}%
 
-DATA SOURCE: Google Solar API LiDAR + Anthropic Claude AI
-----------------------------------
+==================================
+LINEAR MEASUREMENTS
+==================================
+Ridges/Hips: ${Math.round(aiMeasurements?.ridges || 0)} ft
+Valleys: ${Math.round(aiMeasurements?.valleys || 0)} ft
+Rakes: ${Math.round(aiMeasurements?.rakes || 0)} ft
+Eaves: ${Math.round(aiMeasurements?.eaves || 0)} ft
+Total Linear Edges: ${Math.round(
+    (aiMeasurements?.ridges || 0) +
+    (aiMeasurements?.valleys || 0) +
+    (aiMeasurements?.rakes || 0) +
+    (aiMeasurements?.eaves || 0)
+)} ft
+
+${aiMeasurements?.material ? `==================================
+ROOFING MATERIAL
+==================================
+${aiMeasurements.material}` : ''}
+
+${aiMeasurements?.estimationNotes ? `==================================
+ESTIMATION NOTES
+==================================
+${aiMeasurements.estimationNotes}` : ''}
+
+==================================
+DATA SOURCES
+==================================
+- AI Analysis API
+- ${address || 'Property Address'}
+
+Generated: ${new Date().toLocaleString()}
+==================================
         `.trim();
 
         const blob = new Blob([report], { type: 'text/plain' });
@@ -131,7 +137,7 @@ DATA SOURCE: Google Solar API LiDAR + Anthropic Claude AI
                     <div className="mb-10">
                         <div className="flex items-baseline gap-2">
                             <span className="text-6xl font-black text-brand-navy tracking-tighter">
-                                {Math.round(aiMeasurements?.totalAreaSqFt || 0).toLocaleString()}
+                                {Math.round(aiMeasurements?.totalAreaSqFt || areaSqFt || 0).toLocaleString()}
                             </span>
                             <span className="text-lg font-bold text-gray-400">sq ft</span>
                         </div>
@@ -157,7 +163,7 @@ DATA SOURCE: Google Solar API LiDAR + Anthropic Claude AI
                                 <span className="text-[10px] font-bold uppercase tracking-widest">Footprint</span>
                             </div>
                             <span className="text-xl font-bold text-brand-navy">
-                                {Math.round(aiMeasurements?.footprintSqFt || 0).toLocaleString()} <span className="text-xs text-gray-400">ft²</span>
+                                {Math.round(aiMeasurements?.footprintSqFt || areaSqFt || 0).toLocaleString()} <span className="text-xs text-gray-400">ft²</span>
                             </span>
                         </div>
                     </div>

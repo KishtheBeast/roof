@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import RoofMap from './components/MapContainer';
 import AddressSearch from './components/AddressSearch';
 import MeasurementDisplay from './components/MeasurementDisplay';
 import PasswordGate from './components/PasswordGate';
 import { calculatePolygonArea } from './utils/calculateArea';
-import { fetchBuildingInsights, fetchSolarDataLayers, processSolarData } from './utils/solarApi';
-import { geoTiffToDataUrl } from './utils/geotiffUtils';
-import { analyzeRoofWithClaude } from './utils/anthropicApi';
-import { Ruler, Maximize, Shield, TrendingUp, ArrowLeft, ShieldCheck } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { Maximize, Shield, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 import { loginWithApiKey, api } from './utils/auth';
 
@@ -103,8 +98,9 @@ function App() {
             // Transform API response to match UI needs
             const aiResult = {
                 totalAreaSqFt: data.total_area_sqft,
-                footprintSqFt: data.total_area_sqft, // Using total area as footprint for now based on backend
+                footprintSqFt: data.total_area_sqft,
                 pitch: data.predominant_pitch,
+                facetCount: data.facet_count,
                 ridges: data.ridges_hips,
                 valleys: data.valleys,
                 rakes: data.rakes,
@@ -258,7 +254,6 @@ function App() {
                             <div className="h-full w-full bg-white rounded-[3rem] shadow-2xl border border-brand-navy/5 overflow-hidden">
                                 <MeasurementDisplay
                                     areaSqFt={areaSqFt}
-                                    solarData={null}
                                     aiMeasurements={aiMeasurements}
                                     isAnalyzing={false}
                                     address={selectedAddress}
