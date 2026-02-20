@@ -1,8 +1,44 @@
 import React from 'react';
 import { ShieldCheck, Info, Zap, Layers, TrendingUp, Calculator, MousePointer2, Loader2, ArrowRight, Ruler, History, Maximize } from 'lucide-react';
+import { api } from '../utils/auth';
+
+const ROOF_MATERIALS = [
+    { value: 'Asphalt Shingle', label: 'Asphalt Shingle', pricePerSqFt: 4.50 },
+    { value: 'Metal', label: 'Metal', pricePerSqFt: 9.00 },
+    { value: 'Concrete Tile', label: 'Concrete Tile', pricePerSqFt: 12.00 },
+    { value: 'Clay Tile', label: 'Clay Tile', pricePerSqFt: 15.00 },
+    { value: 'Slate', label: 'Slate', pricePerSqFt: 18.00 },
+];
 
 export default function MeasurementDisplay({ areaSqFt, aiMeasurements, isAnalyzing, address }) {
     const [hasSaved, setHasSaved] = React.useState(false);
+    const [selectedMaterial, setSelectedMaterial] = React.useState(aiMeasurements?.material || '');
+    const [isCalculatingCost, setIsCalculatingCost] = React.useState(false);
+    const [costEstimate, setCostEstimate] = React.useState(null);
+
+    const handleMaterialChange = async (material) => {
+        setSelectedMaterial(material);
+        if (!material || !address) return;
+
+        setIsCalculatingCost(true);
+        try {
+            const response = await api.post('/analyze-roof', { address, material });
+            const data = response.data;
+
+            setCostEstimate({
+                material: data.material,
+                totalCost: data.estimated_cost_avg,
+                lowCost: data.estimated_cost_low,
+                highCost: data.estimated_cost_high,
+                costPerSqFt: data.cost_per_sqft,
+                reasoning: data.reasoning
+            });
+        } catch (err) {
+            console.error('Error calculating cost:', err);
+        } finally {
+            setIsCalculatingCost(false);
+        }
+    };
 
     const handleSave = () => {
         const report = `
@@ -168,24 +204,54 @@ Generated: ${new Date().toLocaleString()}
                         </div>
                     </div>
 
-                    {/* Detailed List */}
+                    {/* Material Selection */}
                     <div className="mb-8">
-                        <h3 className="text-xs font-bold text-brand-navy/40 uppercase tracking-widest mb-4 border-b border-gray-100 pb-2">Measurements</h3>
+                        <h3 className="text-xs font-bold text-brand-navy/40 uppercase tracking-widest mb-4 border-b border-gray-100 pb-2">Material Selection</h3>
                         <div className="space-y-3">
-                            {[
-                                { label: 'Ridges', value: aiMeasurements?.ridges },
-                                { label: 'Valleys', value: aiMeasurements?.valleys },
-                                { label: 'Rakes', value: aiMeasurements?.rakes },
-                                { label: 'Eaves', value: aiMeasurements?.eaves }
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between group">
-                                    <span className="text-sm font-medium text-gray-500 group-hover:text-brand-navy transition-colors">{item.label}</span>
-                                    <div className="grow mx-4 border-b border-dotted border-gray-200 relative top-1"></div>
-                                    <span className="text-sm font-bold text-brand-navy font-mono">
-                                        {Math.round(item.value || 0)} <span className="text-xs text-gray-400 font-normal">ft</span>
-                                    </span>
+                            <select
+                                value={selectedMaterial}
+                                onChange={(e) => handleMaterialChange(e.target.value)}
+                                className="w-full p-3 rounded-xl border border-gray-200 bg-white text-brand-navy font-medium text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/50 focus:border-brand-gold"
+                            >
+                                <option value="">Select Material...</option>
+                                {ROOF_MATERIALS.map((mat) => (
+                                    <option key={mat.value} value={mat.value}>
+                                        {mat.label} (${mat.pricePerSqFt}/sq ft)
+                                    </option>
+                                ))}
+                            </select>
+
+                            {isCalculatingCost && (
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Calculating cost...
                                 </div>
-                            ))}
+                            )}
+
+                            {costEstimate && !isCalculatingCost && (
+                                <div className="p-4 rounded-xl bg-green-50 border border-green-100">
+                                    <div className="flex items-baseline gap-2 mb-2">
+                                        <span className="text-3xl font-black text-green-700">
+                                            ${costEstimate.totalCost?.toLocaleString() || '0'}
+                                        </span>
+                                        <span className="text-sm font-medium text-green-600">estimated total</span>
+                                    </div>
+                                    <div className="text-xs text-green-600/70 space-y-1">
+                                        <div className="flex justify-between">
+                                            <span>Low estimate:</span>
+                                            <span className="font-mono">${costEstimate.lowCost?.toLocaleString() || '0'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>High estimate:</span>
+                                            <span className="font-mono">${costEstimate.highCost?.toLocaleString() || '0'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Cost per sq ft:</span>
+                                            <span className="font-mono">${costEstimate.costPerSqFt || '0'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

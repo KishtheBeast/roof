@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ArrowLeft, Ruler, Activity, CheckCircle2, ChevronRight, Info } from 'lucide-react';
+import { Shield, ArrowLeft, Ruler, Activity, CheckCircle2, ChevronRight, Info, DollarSign, Layers } from 'lucide-react';
 import { api } from '../../utils/auth';
+
+const ROOF_MATERIALS = [
+    { value: 'Asphalt Shingle', label: 'Asphalt Shingle', pricePerSqFt: '$4.50' },
+    { value: 'Metal', label: 'Metal', pricePerSqFt: '$9.00' },
+    { value: 'Concrete Tile', label: 'Concrete Tile', pricePerSqFt: '$12.00' },
+    { value: 'Clay Tile', label: 'Clay Tile', pricePerSqFt: '$15.00' },
+    { value: 'Slate', label: 'Slate', pricePerSqFt: '$18.00' },
+];
 
 const AnalysisPage = ({ address, onBack }) => {
     const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [selectedMaterial, setSelectedMaterial] = useState('');
+    const [isCalculatingCost, setIsCalculatingCost] = useState(false);
 
+    // Fetch roof data on mount (without material)
     useEffect(() => {
         const fetchAnalysis = async () => {
             try {
-                // Use the authenticated API instance (handles tokens automatically)
+                // First call: get roof info without material
                 const response = await api.post('/analyze-roof', { address });
                 setData(response.data);
             } catch (err) {
@@ -29,6 +40,41 @@ const AnalysisPage = ({ address, onBack }) => {
             setError("No address provided for analysis.");
         }
     }, [address]);
+
+    // Handle material selection - call API with material to get cost
+    const handleMaterialChange = async (material) => {
+        setSelectedMaterial(material);
+        if (!material) return;
+
+        setIsCalculatingCost(true);
+        try {
+            // Second call: use cached Google data, calculate cost with material
+            const response = await api.post('/analyze-roof', { address, material });
+            setData(response.data);
+        } catch (err) {
+            console.error('Error calculating cost:', err);
+        } finally {
+            setIsCalculatingCost(false);
+        }
+    };
+
+    // Helper to format currency
+    const formatCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(value);
+    };
+
+    // Helper to convert pitch degrees to ratio
+    const degreesToPitchRatio = (degrees) => {
+        if (!degrees || degrees === 0) return 'N/A';
+        const slope = Math.tan(degrees * Math.PI / 180);
+        const ratio = slope * 12;
+        return `${ratio.toFixed(1)}/12`;
+    };
 
     if (isLoading) {
         return (
@@ -138,10 +184,124 @@ const AnalysisPage = ({ address, onBack }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Roof Measurements */}
+                        <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-navy/5">
+                            <h3 className="text-xl font-serif font-black mb-6 uppercase tracking-tight flex items-center gap-3">
+                                <Layers className="w-5 h-5 text-brand-gold" />
+                                Roof Measurements
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div className="bg-brand-navy/5 rounded-2xl p-5 text-center">
+                                    <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-navy/40 mb-2">Area</p>
+                                    <p className="text-2xl font-serif font-black text-brand-navy">
+                                        {data?.total_area_sqft?.toLocaleString() || '0'}
+                                    </p>
+                                    <p className="text-[10px] font-mono text-brand-navy/40">sq ft</p>
+                                </div>
+                                <div className="bg-brand-navy/5 rounded-2xl p-5 text-center">
+                                    <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-navy/40 mb-2">Pitch</p>
+                                    <p className="text-2xl font-serif font-black text-brand-navy">
+                                        {degreesToPitchRatio(data?.predominant_pitch)}
+                                    </p>
+                                    <p className="text-[10px] font-mono text-brand-navy/40">{data?.predominant_pitch}°</p>
+                                </div>
+                                <div className="bg-brand-navy/5 rounded-2xl p-5 text-center">
+                                    <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-navy/40 mb-2">Facets</p>
+                                    <p className="text-2xl font-serif font-black text-brand-navy">
+                                        {data?.facet_count || '0'}
+                                    </p>
+                                    <p className="text-[10px] font-mono text-brand-navy/40">planes</p>
+                                </div>
+                                <div className="bg-brand-navy/5 rounded-2xl p-5 text-center">
+                                    <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-navy/40 mb-2">Material</p>
+                                    <select
+                                        value={selectedMaterial}
+                                        onChange={(e) => handleMaterialChange(e.target.value)}
+                                        className="w-full bg-white border-2 border-brand-navy/10 rounded-xl px-3 py-2 text-lg font-serif font-black text-brand-navy text-center focus:outline-none focus:border-brand-gold cursor-pointer"
+                                    >
+                                        <option value="">Select Material</option>
+                                        {ROOF_MATERIALS.map((mat) => (
+                                            <option key={mat.value} value={mat.value}>
+                                                {mat.label} ({mat.pricePerSqFt}/sqft)
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {isCalculatingCost && (
+                                        <p className="text-[10px] font-mono text-brand-navy/40 mt-2">Calculating...</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Linear Measurements */}
+                            <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="flex items-center justify-between p-4 bg-brand-navy/5 rounded-xl">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-brand-navy/60">Ridges/Hips</span>
+                                    <span className="font-serif font-bold text-brand-navy">{data?.ridges_hips?.toFixed(1) || '0'} ft</span>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-brand-navy/5 rounded-xl">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-brand-navy/60">Valleys</span>
+                                    <span className="font-serif font-bold text-brand-navy">{data?.valleys?.toFixed(1) || '0'} ft</span>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-brand-navy/5 rounded-xl">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-brand-navy/60">Rakes</span>
+                                    <span className="font-serif font-bold text-brand-navy">{data?.rakes?.toFixed(1) || '0'} ft</span>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-brand-navy/5 rounded-xl">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-brand-navy/60">Eaves</span>
+                                    <span className="font-serif font-bold text-brand-navy">{data?.eaves?.toFixed(1) || '0'} ft</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Right Column: Data & Calculations */}
                     <div className="lg:col-span-5 space-y-8">
+                        {/* Cost Estimate Card */}
+                        <div className="bg-gradient-to-br from-brand-navy to-brand-navy/90 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-gold opacity-10 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
+
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-8">
+                                    <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                                        <DollarSign className="w-6 h-6 text-brand-gold" />
+                                    </div>
+                                    <span className="text-[11px] font-mono font-black uppercase tracking-[0.3em] text-white/40">Estimated Cost</span>
+                                </div>
+
+                                <div className="mb-6">
+                                    <p className="text-white/40 text-xs font-mono mb-2">Average Estimate</p>
+                                    <div className="flex items-baseline gap-2">
+                                        {data?.estimated_cost_avg ? (
+                                            <span className="text-5xl font-serif font-black text-brand-gold">
+                                                {formatCurrency(data.estimated_cost_avg)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-4xl font-serif font-black text-white/30">--</span>
+                                        )}
+                                    </div>
+                                    {!data?.estimated_cost_avg && (
+                                        <p className="text-white/40 text-xs font-mono mt-2">Select a material to calculate cost</p>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="flex-1 p-4 bg-white/5 rounded-2xl border border-white/10">
+                                        <p className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-1">Low</p>
+                                        <p className="text-xl font-serif font-bold text-white">
+                                            {data?.estimated_cost_low ? formatCurrency(data.estimated_cost_low) : '--'}
+                                        </p>
+                                    </div>
+                                    <div className="flex-1 p-4 bg-white/5 rounded-2xl border border-white/10">
+                                        <p className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-1">High</p>
+                                        <p className="text-xl font-serif font-bold text-white">
+                                            {data?.estimated_cost_high ? formatCurrency(data.estimated_cost_high) : '--'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Area Card */}
                         <div className="bg-brand-navy text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden group">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-brand-gold opacity-5 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
@@ -160,42 +320,18 @@ const AnalysisPage = ({ address, onBack }) => {
                                     </span>
                                     <span className="text-xl font-serif font-bold text-white/40 italic">sq ft</span>
                                 </div>
-                                <p className="text-white/40 text-xs font-mono mb-8">Calculated via Vision AI Geometry</p>
+                                <p className="text-white/40 text-xs font-mono mb-8">Professional roof estimation</p>
 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                                         <span className="text-[10px] font-mono uppercase tracking-widest text-white/60">Material Type</span>
-                                        <span className="font-serif font-bold text-brand-gold">{data?.material || 'Unknown'}</span>
+                                        <span className="font-serif font-bold text-brand-gold">{data?.material?.replace(' (baseline)', '') || 'Unknown'}</span>
                                     </div>
                                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                                         <span className="text-[10px] font-mono uppercase tracking-widest text-white/60">Pitch Estimation</span>
-                                        <span className="font-serif font-bold text-brand-gold">4/12 (Standard)</span>
+                                        <span className="font-serif font-bold text-brand-gold">{degreesToPitchRatio(data?.predominant_pitch)} ({data?.predominant_pitch}°)</span>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Analysis Breakdown */}
-                        <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-navy/5">
-                            <h3 className="text-xl font-serif font-black mb-6 uppercase tracking-tight">Vision Logs</h3>
-                            <div className="space-y-6">
-                                {[
-                                    { label: 'Cloud Buffer', value: '0.0ms', status: 'Optimal' },
-                                    { label: 'Edge Detection', value: 'High Conf.', status: 'Success' },
-                                    { label: 'Material Logic', value: data?.material || 'N/A', status: 'Inferred' },
-                                    { label: 'Calculation Matrix', value: 'S² Method', status: 'Verified' }
-                                ].map((item, i) => (
-                                    <div key={i} className="flex items-center justify-between group border-b border-brand-navy/5 pb-4 last:border-0 last:pb-0">
-                                        <div>
-                                            <p className="text-[10px] font-mono font-bold text-brand-navy/40 uppercase tracking-widest">{item.label}</p>
-                                            <p className="text-sm font-bold text-brand-navy">{item.value}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-brand-green-dark"></div>
-                                            <span className="text-[10px] font-mono text-brand-green-dark uppercase font-black tracking-widest">{item.status}</span>
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
                         </div>
 
