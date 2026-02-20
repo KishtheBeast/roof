@@ -74,10 +74,21 @@ Total Linear Edges: ${Math.round(
     (aiMeasurements?.eaves || 0)
 )} ft
 
-${aiMeasurements?.material ? `==================================
+${selectedMaterial ? `==================================
 ROOFING MATERIAL
 ==================================
-${aiMeasurements.material}` : ''}
+${selectedMaterial}` : (aiMeasurements?.material ? `==================================
+ROOFING MATERIAL
+==================================
+${aiMeasurements.material}` : '')}
+
+${costEstimate ? `==================================
+COST ESTIMATE
+==================================
+Selected Material: ${costEstimate.material}
+Total Estimated Cost: $${costEstimate.totalCost?.toLocaleString() || '0'}
+Price Range: $${costEstimate.lowCost?.toLocaleString() || '0'} - $${costEstimate.highCost?.toLocaleString() || '0'}
+Cost Per Sq Ft: $${costEstimate.costPerSqFt || '0'}` : ''}
 
 ${aiMeasurements?.estimationNotes ? `==================================
 ESTIMATION NOTES
