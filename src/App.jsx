@@ -160,23 +160,22 @@ function App() {
 
     return (
         <PasswordGate>
-            <div className="h-screen w-screen relative overflow-hidden bg-brand-beige font-sans">
+            <div className="h-[100dvh] w-screen relative overflow-hidden bg-brand-beige font-sans touch-manipulation">
                 {/* Landing Page Mode */}
                 {!hasLocation && (
                     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-brand-navy text-white">
                         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517486430290-35657a918550?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center opacity-10 grayscale transform scale-105"></div>
                         <div className="relative z-10 max-w-4xl px-4 text-center">
-                            <div className="inline-block px-4 py-1.5 mb-8 text-[11px] font-bold tracking-[0.2em] text-brand-gold uppercase bg-white/5 rounded-full border border-white/10 backdrop-blur-sm font-mono">
+                            <div className="inline-block px-3 py-1 mb-4 md:mb-6 text-[9px] md:text-[11px] font-bold tracking-[0.2em] text-brand-gold uppercase bg-white/5 rounded-full border border-white/10 backdrop-blur-sm font-mono">
                                 The Modern Professional Craftsman
                             </div>
-                            <h1 className="text-6xl md:text-8xl font-serif font-black leading-[0.9] tracking-tight mb-8">
+                            <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-7xl font-serif font-black leading-[0.9] tracking-tight mb-3 md:mb-6">
                                 Satellite <span className="text-brand-gold italic">Roof</span> <br />Measurement
                             </h1>
-                            <p className="text-lg text-gray-300 mb-12 max-w-2xl mx-auto leading-relaxed font-sans">
+                            <p className="text-sm md:text-base text-gray-300 mb-6 md:mb-10 max-w-2xl mx-auto leading-relaxed font-sans px-2">
                                 Instantly measure roof area from high-resolution satellite imagery.
-                                Professional precision with automated pitch adjustment and detailed reporting.
                             </p>
-                            <div className="relative w-full max-w-xl mx-auto mb-16">
+                            <div className="w-full max-w-xl mx-auto mb-12 md:mb-16 px-4">
                                 <AddressSearch onLocationSelect={handleLocationSelect} className="w-full relative z-20" />
                                 <div className="absolute -inset-1 bg-brand-gold/20 rounded-lg blur-2xl opacity-50"></div>
                             </div>
@@ -222,16 +221,17 @@ function App() {
                 {hasLocation && !isLoadingSolar && aiMeasurements && (
                     <div className="absolute inset-0 z-0 h-full w-full bg-brand-beige flex flex-col animate-in fade-in duration-500">
                         {/* Header */}
-                        <div className="h-20 bg-brand-navy flex items-center justify-between px-8 border-b border-white/10 shrink-0 shadow-lg z-10">
-                            <div className="flex items-center gap-6">
-                                <div className="p-2 bg-brand-gold rounded-lg">
-                                    <ShieldCheck className="w-6 h-6 text-brand-navy" />
+                        <div className="h-16 md:h-20 bg-brand-navy flex items-center justify-between px-4 md:px-8 border-b border-white/10 shrink-0 shadow-lg z-10">
+                            <div className="flex items-center gap-3 md:gap-6">
+                                <div className="p-1.5 md:p-2 bg-brand-gold rounded-lg">
+                                    <ShieldCheck className="w-4 h-4 md:w-6 md:h-6 text-brand-navy" />
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-white font-serif font-black text-xl tracking-tight">{selectedAddress}</span>
-                                    <span className="text-brand-gold text-xs font-mono uppercase tracking-[0.2em] flex items-center gap-2">
+                                <div className="flex flex-col max-w-[180px] md:max-w-none">
+                                    <span className="text-white font-serif font-black text-sm md:text-xl tracking-tight truncate">{selectedAddress}</span>
+                                    <span className="text-brand-gold text-[10px] md:text-xs font-mono uppercase tracking-[0.2em] flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                                        AI Analysis Complete
+                                        <span className="hidden sm:inline">AI Analysis Complete</span>
+                                        <span className="sm:hidden">Complete</span>
                                     </span>
                                 </div>
                             </div>
@@ -242,16 +242,17 @@ function App() {
                                     setSelectedAddress('');
                                     setSolarData(null);
                                 }}
-                                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/5 transition-all text-xs font-mono font-bold uppercase tracking-widest flex items-center gap-2 group"
+                                className="px-3 md:px-6 py-2 md:py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/5 transition-all text-[10px] md:text-xs font-mono font-bold uppercase tracking-widest flex items-center gap-2 group"
                             >
-                                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                                New Search
+                                <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 group-hover:-translate-x-1 transition-transform" />
+                                <span className="hidden sm:inline">New Search</span>
+                                <span className="sm:hidden">Back</span>
                             </button>
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-hidden relative p-8 bg-brand-beige">
-                            <div className="h-full w-full bg-white rounded-[3rem] shadow-2xl border border-brand-navy/5 overflow-hidden">
+                        <div className="flex-1 overflow-hidden relative p-3 md:p-8 bg-brand-beige">
+                            <div className="h-full w-full bg-white rounded-2xl md:rounded-[3rem] shadow-2xl border border-brand-navy/5 overflow-hidden">
                                 <MeasurementDisplay
                                     areaSqFt={areaSqFt}
                                     aiMeasurements={aiMeasurements}

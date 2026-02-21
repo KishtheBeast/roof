@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, MapPin } from 'lucide-react';
 
-export default function AddressSearch({ onLocationSelect, className = "absolute top-4 left-4 z-[1000] w-full max-w-md font-sans" }) {
+export default function AddressSearch({ onLocationSelect, className = "w-full max-w-md font-sans" }) {
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState([]);
@@ -90,12 +90,12 @@ export default function AddressSearch({ onLocationSelect, className = "absolute 
                 <input
                     type="text"
                     placeholder="Search address..."
-                    className="w-full pl-12 pr-4 py-4 rounded-xl shadow-2xl border border-brand-navy/5 focus:outline-none focus:ring-2 focus:ring-brand-gold bg-white/90 backdrop-blur-xl text-brand-navy font-bold placeholder:text-brand-navy/30 transition-all group-hover:bg-white"
+                    className="w-full pl-10 md:pl-12 pr-4 py-3 md:py-4 rounded-xl shadow-2xl border border-brand-navy/5 focus:outline-none focus:ring-2 focus:ring-brand-gold bg-white/90 backdrop-blur-xl text-brand-navy font-bold placeholder:text-brand-navy/30 transition-all group-hover:bg-white text-base md:text-sm"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
                 />
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-brand-gold w-5 h-5 transition-transform group-focus-within:scale-110" strokeWidth={3} />
+                <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 text-brand-gold w-4 h-4 md:w-5 md:h-5 transition-transform group-focus-within:scale-110" strokeWidth={3} />
                 {loading && (
                     <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-brand-gold border-b-transparent"></div>

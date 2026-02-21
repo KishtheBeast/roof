@@ -127,10 +127,10 @@ Generated: ${new Date().toLocaleString()}
     );
 
     return (
-        <div className="w-full h-full bg-white flex overflow-hidden font-sans text-brand-navy">
+        <div className="w-full h-full bg-white flex flex-col md:flex-row overflow-hidden font-sans text-brand-navy">
 
-            {/* LEFT PANE - 65% - Satellite Image Map */}
-            <div className="w-[65%] h-full relative bg-brand-navy/5 group overflow-hidden">
+            {/* LEFT PANE - Satellite Image Map - Full width on mobile, 65% on desktop */}
+            <div className="w-full md:w-[65%] h-[45vh] md:h-full relative bg-brand-navy/5 group overflow-hidden">
                 {aiMeasurements?.highlightedImage ? (
                     <>
                         <img
@@ -161,11 +161,11 @@ Generated: ${new Date().toLocaleString()}
                 )}
             </div>
 
-            {/* RIGHT PANE - 35% - Data Sidebar */}
-            <div className="w-[35%] h-full bg-white flex flex-col border-l border-brand-navy/10 relative shadow-2xl z-20">
+            {/* RIGHT PANE - Data Sidebar - Full width on mobile, 35% on desktop */}
+            <div className="w-full md:w-[35%] h-[55vh] md:h-full bg-white flex flex-col border-l border-brand-navy/10 relative shadow-2xl z-20">
 
                 {/* Header */}
-                <div className="px-8 pt-10 pb-6 shrink-0">
+                <div className="px-4 md:px-8 pt-6 md:pt-10 pb-4 md:pb-6 shrink-0">
                     <div className="mb-4">
                         <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-widest mb-3">
                             Ready for Review
@@ -178,21 +178,21 @@ Generated: ${new Date().toLocaleString()}
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto px-8 py-2 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto px-3 md:px-8 py-2 custom-scrollbar">
 
                     {/* Hero Metric */}
-                    <div className="mb-10">
+                    <div className="mb-6 md:mb-10">
                         <div className="flex items-baseline gap-2">
-                            <span className="text-6xl font-black text-brand-navy tracking-tighter">
+                            <span className="text-4xl md:text-6xl font-black text-brand-navy tracking-tighter">
                                 {Math.round(aiMeasurements?.totalAreaSqFt || areaSqFt || 0).toLocaleString()}
                             </span>
-                            <span className="text-lg font-bold text-gray-400">sq ft</span>
+                            <span className="text-sm md:text-lg font-bold text-gray-400">sq ft</span>
                         </div>
                         <span className="text-xs font-bold text-brand-navy/40 uppercase tracking-widest">Total Surface Area</span>
                     </div>
 
                     {/* Secondary Metrics Grid */}
-                    <div className="grid grid-cols-2 gap-4 mb-10">
+                    <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-10">
                         <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
                             <div className="flex items-center gap-2 mb-2 text-brand-navy/40">
                                 <TrendingUp className="w-4 h-4" />
@@ -268,7 +268,7 @@ Generated: ${new Date().toLocaleString()}
                 </div>
 
                 {/* Sticky Footer */}
-                <div className="p-8 border-t border-gray-100 bg-white shrink-0">
+                <div className="p-4 md:p-8 border-t border-gray-100 bg-white shrink-0">
                     <div className="flex flex-col gap-3">
                         <button
                             onClick={() => alert('Order integration coming soon')}
