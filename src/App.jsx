@@ -4,6 +4,7 @@ import { loginWithApiKey } from './utils/auth';
 import { useMapControl } from './hooks/useMapControl';
 import { useAiAnalysis } from './hooks/useAiAnalysis';
 import LoadingPage from './pages/LoadingPage';
+import ErrorPage from './pages/ErrorPage';
 import { ShieldCheck } from 'lucide-react';
 
 // Lazy load pages for code splitting
@@ -15,11 +16,13 @@ const ResultsPage = lazy(() => import('./pages/ResultsPage'));
  * Uses hooks for state management
  */
 function MainApp() {
-    const { initializeMaps } = useMapControl();
+    const { initializeMaps, mapError } = useMapControl();
     const {
         aiMeasurements,
         triggerAiAnalysis,
-        setAiMeasurements
+        setAiMeasurements,
+        error,
+        clearMeasurements
     } = useAiAnalysis();
 
     // UI state
@@ -45,16 +48,39 @@ function MainApp() {
         }, 100);
     }, [triggerAiAnalysis, setAiMeasurements]);
 
-    // Clear loading state when AI measurements arrive
+    // Clear loading state when AI measurements arrive or error occurs
     React.useEffect(() => {
-        if (aiMeasurements) {
+        if (aiMeasurements || error) {
             setIsLoadingSolar(false);
         }
-    }, [aiMeasurements]);
+    }, [aiMeasurements, error]);
 
     // Render loading state
     if (isLoadingSolar) {
         return <LoadingPage />;
+    }
+
+    // Render error state (API or Maps)
+    if (error || mapError) {
+        return (
+            <ErrorPage
+                error={error || mapError}
+                onRetry={() => {
+                    if (mapError) {
+                        initializeMaps();
+                    } else {
+                        setIsLoadingSolar(true);
+                        triggerAiAnalysis(selectedAddress);
+                    }
+                }}
+                onBack={() => {
+                    setHasLocation(false);
+                    clearMeasurements();
+                    setSelectedAddress('');
+                    if (mapError) initializeMaps();
+                }}
+            />
+        );
     }
 
     // Render results page

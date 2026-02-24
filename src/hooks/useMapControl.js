@@ -3,39 +3,33 @@ import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 
 // Initialize Google Maps API at module load time
 const API_KEY = import.meta.env?.VITE_GOOGLE_MAPS_API_KEY;
-if (API_KEY) {
-    setOptions({
-        apiKey: API_KEY,
-        key: API_KEY,
-        version: 'weekly',
-        libraries: ['places']
-    });
-    
-    // Pre-initialize libraries at module load
-    importLibrary('maps').catch(e => console.error('[Google Maps] Maps library load error:', e));
-    importLibrary('places').catch(e => console.error('[Google Maps] Places library load error:', e));
-}
 
-// Masked runtime check for the Maps API key
-try {
-    if (API_KEY) {
-        // log only a prefix to avoid exposing the full key
-        // eslint-disable-next-line no-console
-        console.log('Maps API key present:', API_KEY.slice(0, 8) + '...');
-    } else {
-        // eslint-disable-next-line no-console
-        console.warn('VITE_GOOGLE_MAPS_API_KEY is not set at runtime');
+// Global flag to ensure Google Maps is initialized only once
+if (API_KEY && !window.__GOOGLE_MAPS_INITIALIZED__) {
+    try {
+        setOptions({
+            apiKey: API_KEY,
+            key: API_KEY,
+            version: 'weekly',
+            libraries: ['places']
+        });
+        
+        // Pre-initialize libraries at module load
+        importLibrary('maps').catch(e => console.error('[Google Maps] Maps library load error:', e));
+        importLibrary('places').catch(e => console.error('[Google Maps] Places library load error:', e));
+        
+        window.__GOOGLE_MAPS_INITIALIZED__ = true;
+    } catch (e) {
+        console.error('[Google Maps] Initialization error:', e);
     }
-} catch (e) {
-    // ignore in non-browser environments
 }
 
 /**
  * Custom hook for Google Maps initialization and address search
- * Provides address autocomplete and place details fetching
  */
 export function useMapControl() {
     const [isMapsLoading, setIsMapsLoading] = useState(false);
+    const [mapError, setMapError] = useState(null);
     const [searchResults, setSearchResults] = useState([]);
     const [hasMoreResults, setHasMoreResults] = useState(false);
     const sessionTokenRef = useRef(null);
@@ -44,6 +38,7 @@ export function useMapControl() {
     const initializeMaps = useCallback(async () => {
         try {
             setIsMapsLoading(true);
+            setMapError(null);
             
             // Wait for Google Maps to be available (pre-initialized at module load)
             let attempts = 0;
@@ -53,12 +48,13 @@ export function useMapControl() {
             }
             
             if (!window.google?.maps) {
-                throw new Error('Google Maps failed to load');
+                throw new Error('Google Maps failed to load. Please check your internet connection or disable ad-blockers for this site.');
             }
 
             return true;
         } catch (error) {
             console.error('Failed to initialize Google Maps:', error);
+            setMapError(error.message);
             return false;
         } finally {
             setIsMapsLoading(false);
@@ -145,6 +141,7 @@ export function useMapControl() {
 
     return {
         isMapsLoading,
+        mapError,
         searchResults,
         hasMoreResults,
         initializeMaps,

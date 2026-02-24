@@ -16,10 +16,18 @@ export default function MeasurementDisplay({ areaSqFt, aiMeasurements, isAnalyzi
     const [isCalculatingCost, setIsCalculatingCost] = React.useState(false);
     const [costEstimate, setCostEstimate] = React.useState(aiMeasurements?.costEstimate || null);
 
+    // Use batch estimates from initial analysis if available
     const handleMaterialChange = async (material) => {
         setSelectedMaterial(material);
         if (!material || !address) return;
 
+        // Check if we have the estimate already in the batch data
+        if (aiMeasurements?.allCostEstimates && aiMeasurements.allCostEstimates[material]) {
+            setCostEstimate(aiMeasurements.allCostEstimates[material]);
+            return;
+        }
+
+        // Fallback for older API versions or missing data
         setIsCalculatingCost(true);
         try {
             const response = await api.post('/analyze-roof', { address, material });

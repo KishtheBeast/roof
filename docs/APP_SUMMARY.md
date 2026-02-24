@@ -51,12 +51,24 @@ User Input → AddressSearch (useMapControl)
     → View Switch to ResultsPage (MeasurementDisplay initializes with costEstimate)
 ```
 
+## Optimizations & UI Improvements (Implemented)
+
+### Frontend (Roof App)
+- **[Perf] Instant Material Switching**: Uses `all_cost_estimates` from the initial API response to update costs without extra network requests.
+- **[Perf] Client-Side Caching**: Implemented `localStorage` caching for the last 10 searched addresses to eliminate duplicate API calls and provide instant results for repeated searches.
+- **[UX] Automatic Cost Estimation**: Defaults to "Asphalt Shingle" on initial analysis to provide immediate cost feedback.
+
+### Backend (FastAPI Roof)
+- **[API] Batch Costing**: The `/analyze-roof` endpoint now returns cost estimates for all supported materials in a single response.
+- **[Img] WebP Compression**: Satellite imagery is converted to WebP format (75% quality) on the server, reducing payload size by ~60% compared to JPEG.
+- **[Perf] Redis-style Caching**: In-memory caching for Google Solar data minimizes API latency and costs for repeat lookups.
+
 ## Current Status
-- **Enhanced UX**: The app now provides a complete measurement and cost profile immediately upon searching an address, reducing manual user interaction.
-- **Backend-First Architecture**: Client-side calculations and GeoTIFF processing have been removed in favor of robust server-side AI.
-- **Clean Codebase**: All outdated scripts and unused utility files have been purged.
+- **Enhanced UX**: The app now provides a complete measurement and cost profile immediately upon searching an address.
+- **Backend-First Architecture**: Client-side calculations have been successfully offloaded to a high-performance AI backend.
+- **Clean Codebase**: Purged of legacy drawing and GeoTIFF processing logic.
 
 ## Planned Improvements
 1. **TypeScript Migration**: Convert key files to `.tsx` for better type safety.
 2. **Testing**: Add unit tests for hooks and utility functions.
-3. **Error Handling**: Improve user feedback for specific API failures.
+3. **Error Handling**: Improve user feedback for specific API failures (e.g., "Address not a building").
