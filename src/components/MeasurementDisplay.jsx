@@ -54,6 +54,7 @@ ROOF MEASUREMENT REPORT
 ==================================
 DATE: ${new Date().toLocaleString()}
 ADDRESS: ${address || 'Unknown'}
+PROPERTY TYPE: ${aiMeasurements?.propertyType || 'Single Family'}
 
 ==================================
 AREA MEASUREMENTS
@@ -175,9 +176,16 @@ Generated: ${new Date().toLocaleString()}
                 {/* Header */}
                 <div className="px-4 md:px-8 pt-6 md:pt-10 pb-4 md:pb-6 shrink-0">
                     <div className="mb-4">
-                        <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-widest mb-3">
-                            Ready for Review
-                        </span>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-widest">
+                                Ready for Review
+                            </span>
+                            {aiMeasurements?.propertyType && (
+                                <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-widest">
+                                    {aiMeasurements.propertyType}
+                                </span>
+                            )}
+                        </div>
                         <h1 className="text-2xl font-bold leading-tight text-brand-navy mb-1">
                             {address || "Unknown Address"}
                         </h1>

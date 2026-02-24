@@ -94,7 +94,8 @@ export function useAiAnalysis() {
                 confidenceScore: data.confidence_score || 0.98,
                 estimationNotes: data.reasoning,
                 complexity: data.complexity || 'Unknown',
-                allCostEstimates: data.all_cost_estimates
+                allCostEstimates: data.all_cost_estimates,
+                propertyType: data.property_type || 'Single Family'
             };
 
             // Include cost estimate if provided by the backend
