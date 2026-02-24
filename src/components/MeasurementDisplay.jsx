@@ -12,9 +12,9 @@ const ROOF_MATERIALS = [
 
 export default function MeasurementDisplay({ areaSqFt, aiMeasurements, isAnalyzing, address }) {
     const [hasSaved, setHasSaved] = React.useState(false);
-    const [selectedMaterial, setSelectedMaterial] = React.useState(aiMeasurements?.material || '');
+    const [selectedMaterial, setSelectedMaterial] = React.useState(aiMeasurements?.material || 'Asphalt Shingle');
     const [isCalculatingCost, setIsCalculatingCost] = React.useState(false);
-    const [costEstimate, setCostEstimate] = React.useState(null);
+    const [costEstimate, setCostEstimate] = React.useState(aiMeasurements?.costEstimate || null);
 
     const handleMaterialChange = async (material) => {
         setSelectedMaterial(material);

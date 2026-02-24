@@ -26,14 +26,14 @@ const startRefreshTimer = () => {
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(async () => {
         if (getAccessToken()) {
-            console.log("⏰ Auto-refreshing token (55 min interval)...");
+            console.debug("Auto-refreshing token (55 min interval)...");
             try {
                 const response = await api.post('/refresh');
                 const { access_token } = response.data;
                 setAccessToken(access_token);
-                console.log("✅ Token auto-refresh successful");
+                console.debug("Token auto-refresh successful");
             } catch (err) {
-                console.error("❌ Token auto-refresh failed:", err);
+                console.error("Token auto-refresh failed:", err);
             }
         }
     }, TOKEN_REFRESH_INTERVAL);
@@ -62,7 +62,7 @@ const processQueue = (error, token = null) => {
 // Initial Login (Call this on App mount)
 export const loginWithApiKey = async (apiKey) => {
     try {
-        console.log("🔐 Authenticating with API Key...");
+        console.debug("Authenticating with API Key...");
         const response = await api.post('/token', null, {
             params: { api_key: apiKey }
         });
@@ -70,10 +70,10 @@ export const loginWithApiKey = async (apiKey) => {
         const { access_token } = response.data;
         setAccessToken(access_token);
         startRefreshTimer(); // Start auto-refresh timer
-        console.log("✅ Authentication successful");
+        console.debug("Authentication successful");
         return true;
     } catch (error) {
-        console.error("❌ Authentication failed:", error);
+        console.error("Authentication failed:", error);
         return false;
     }
 };
@@ -90,7 +90,7 @@ export const setAccessToken = (token) => {
 export const logout = () => {
     stopRefreshTimer();
     localStorage.removeItem(ACCESS_TOKEN_KEY);
-    console.log("👋 Logged out and timer stopped");
+    console.debug("Logged out and timer stopped");
 };
 
 // Axios Request Interceptor: Attach Token
@@ -130,7 +130,7 @@ api.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                console.log("🔄 Access token expired. Attempting refresh...");
+                console.debug("Access token expired. Attempting refresh...");
                 // Call /refresh endpoint (cookies are sent automatically due to withCredentials: true)
                 const response = await api.post('/refresh');
 
@@ -138,7 +138,7 @@ api.interceptors.response.use(
                 setAccessToken(access_token);
                 startRefreshTimer(); // Restart auto-refresh timer
 
-                console.log("✅ Token refresh successful");
+                console.debug("Token refresh successful");
 
                 // Retry queued requests
                 processQueue(null, access_token);
@@ -148,7 +148,7 @@ api.interceptors.response.use(
                 return api(originalRequest);
 
             } catch (err) {
-                console.error("❌ Token refresh failed. User might need to re-login.");
+                console.error("Token refresh failed. User might need to re-login.");
                 processQueue(err, null);
                 return Promise.reject(err);
             } finally {
